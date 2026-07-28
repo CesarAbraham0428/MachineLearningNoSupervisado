@@ -9,6 +9,7 @@ from views.data_view import (
     renderizar_metricas,
     renderizar_vista_datos,
 )
+from views.statistics_view import renderizar_vista_estadisticas
 
 
 _SECCIONES = (
@@ -81,11 +82,7 @@ def main() -> None:
     if tab_activa == 0:
         renderizar_vista_datos()
     elif tab_activa == 1:
-        _renderizar_estado_vacio(
-            "Estadística descriptiva",
-            "Aquí podrás revisar distribución, valores nulos, duplicados y medidas descriptivas del dataset.",
-            "bar_chart",
-        )
+        renderizar_vista_estadisticas()
     elif tab_activa == 2:
         _renderizar_estado_vacio(
             "Entrenamiento K-Means",
