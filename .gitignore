@@ -1,3 +1,7 @@
 venv/
 
 __pycache__/
+
+# Skills locales del agente; se restauran mediante skills-lock.json
+.agents/skills/
+.claude/skills/

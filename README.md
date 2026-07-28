@@ -1,6 +1,11 @@
 # ClusterLab
 
-Proyecto de extracción de conocimiento en bases de datos y clustering.
+## Descripción de la aplicación
+
+ClusterLab es una aplicación web desarrollada en Python con Streamlit que permite realizar análisis exploratorio de datos y entrenar modelos de aprendizaje no supervisado de forma sencilla e interactiva. Su objetivo es facilitar el proceso de carga, preparación, análisis y agrupamiento de conjuntos de datos sin necesidad de conocimientos avanzados en programación.
+
+La aplicación está orientada a estudiantes, investigadores y usuarios que desean experimentar con técnicas de clustering para descubrir patrones, segmentar datos y obtener información relevante a partir de un conjunto de datos. Todo el flujo de trabajo se realiza desde una única interfaz, donde el usuario puede cargar un archivo, analizarlo, entrenar un modelo, visualizar los resultados y guardar el modelo entrenado para utilizarlo posteriormente.
+
 
 ## Estructura del proyecto
 
@@ -12,13 +17,16 @@ Proyecto de extracción de conocimiento en bases de datos y clustering.
 - `assets/`: Estilos CSS y recursos estáticos.
 - `tests/`: Pruebas unitarias.
 
-Descripción de la aplicación
+### Iniciar aplicación:
 
-ClusterLab es una aplicación web desarrollada en Python con Streamlit que permite realizar análisis exploratorio de datos y entrenar modelos de aprendizaje no supervisado de forma sencilla e interactiva. Su objetivo es facilitar el proceso de carga, preparación, análisis y agrupamiento de conjuntos de datos sin necesidad de conocimientos avanzados en programación.
+```python
 
-La aplicación está orientada a estudiantes, investigadores y usuarios que desean experimentar con técnicas de clustering para descubrir patrones, segmentar datos y obtener información relevante a partir de un conjunto de datos. Todo el flujo de trabajo se realiza desde una única interfaz, donde el usuario puede cargar un archivo, analizarlo, entrenar un modelo, visualizar los resultados y guardar el modelo entrenado para utilizarlo posteriormente.
+streamlit run app.py
 
-Resumen de funcionalidades
+```
+
+
+### Resumen de funcionalidades
 
 La aplicación permitirá al usuario realizar las siguientes actividades:
 
@@ -35,25 +43,3 @@ Guardar modelos entrenados, almacenando tanto el modelo como sus metadatos, entr
 Administrar los modelos almacenados, permitiendo consultar la información de cada modelo y reutilizarlo posteriormente con nuevos conjuntos de datos compatibles.
 
 En conjunto, la aplicación implementa un flujo completo de análisis de datos y aprendizaje no supervisado: desde la carga del dataset hasta la generación de resultados y la persistencia de modelos entrenados, todo integrado en una única interfaz web fácil de utilizar.
-
-#0B1220  Fondo principal
-#111827  Fondo secundario
-#162033  Tarjetas
-#1A2436  Tablas
-#1F2A40  Hover
-#2A3953  Bordes
-
-#2563EB  Azul principal
-#3B82F6  Azul hover
-#60A5FA  Links
-
-#A855F7  Morado
-#22C55E  Verde
-#F59E0B  Naranja
-#FBBF24  Amarillo
-#EF4444  Rojo
-
-#F8FAFC  Texto principal
-#CBD5E1  Texto secundario
-#94A3B8  Texto terciario
-#64748B  Placeholder
