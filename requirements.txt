@@ -1,0 +1,12 @@
+# Dependencias del proyecto
+
+streamlit
+pandas
+numpy
+scikit-learn
+joblib
+plotly
+matplotlib
+openpyxl
+fpdf2
+pytest
