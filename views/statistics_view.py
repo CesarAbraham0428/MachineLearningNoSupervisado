@@ -23,13 +23,15 @@ _ETIQUETAS_LIKERT = {
 
 
 def _obtener_datos_activos() -> pd.DataFrame | None:
-    """Da prioridad al dataset limpio; si no existe, usa el cargado o el filtrado."""
+    """Usa el subconjunto activo; si no existe, recurre al dataset limpio o cargado."""
+    dataframe_filtrado = st.session_state.get("dataframe_filtrado")
+    if dataframe_filtrado is not None:
+        return dataframe_filtrado
+
     dataset_limpio = st.session_state.get("dataset_limpio")
     if dataset_limpio is not None:
         return dataset_limpio
-    return st.session_state.get(
-        "dataframe_filtrado", st.session_state.get("dataframe_cargado")
-    )
+    return st.session_state.get("dataframe_cargado")
 
 
 def _grafica_frecuencias(resumen: ResumenEstadistico):

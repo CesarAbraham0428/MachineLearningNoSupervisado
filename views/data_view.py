@@ -76,6 +76,26 @@ def _crear_firma_filtro(
     return tuple(map(str, columnas)), str(columna_filtro), str(valor_filtro)
 
 
+def _obtener_subconjunto(
+    datos: pd.DataFrame,
+    columnas: list[str],
+    columna_filtro: str = _SIN_FILTRO,
+    valor_filtro: object = _TODOS,
+) -> pd.DataFrame:
+    """Aplica los filtros de filas y columnas al dataset sin modificarlo."""
+    columnas_validas = [columna for columna in columnas if columna in datos.columns]
+    resultado = datos
+    if (
+        columna_filtro in datos.columns
+        and columna_filtro != _SIN_FILTRO
+        and valor_filtro != _TODOS
+    ):
+        resultado = datos.loc[
+            datos[columna_filtro].astype(str).eq(str(valor_filtro))
+        ]
+    return resultado.loc[:, columnas_validas].copy()
+
+
 
 def _cargar_archivo(archivo_subido) -> tuple[pd.DataFrame | None, str]:
     """Valida y carga un archivo CSV o Excel."""
@@ -509,10 +529,26 @@ def renderizar_vista_datos() -> None:
 
     # Calcular df_filtrado ANTES del contenedor usando la selección persistida,
     # para que el botón de exportar ya tenga el dataset correcto al renderizarse.
-    columnas_persistidas = st.session_state.columnas_seleccionadas
+    columnas_persistidas = st.session_state.get(
+        "ms_columnas_filtro", st.session_state.columnas_seleccionadas
+    )
+    columnas_persistidas = [
+        columna for columna in columnas_persistidas if columna in todas_columnas
+    ]
     columnas_persistidas_validas = len(columnas_persistidas) >= 2
-    columnas_para_exportar = columnas_persistidas if columnas_persistidas_validas else todas_columnas
-    df_para_exportar = df_cargado[columnas_para_exportar]
+    columnas_para_exportar = (
+        columnas_persistidas if columnas_persistidas_validas else todas_columnas
+    )
+    columna_filtro_exportacion = st.session_state.get(
+        "sel_columna_filtro", _SIN_FILTRO
+    )
+    valor_filtro_exportacion = st.session_state.get("sel_valor_filtro", _TODOS)
+    df_para_exportar = _obtener_subconjunto(
+        df_cargado,
+        columnas_para_exportar,
+        columna_filtro_exportacion,
+        valor_filtro_exportacion,
+    )
 
     with st.container(border=True, key="dataset-panel"):
         col_titulo, col_exportar, col_borrar = st.columns(
@@ -614,16 +650,13 @@ def renderizar_vista_datos() -> None:
             # Si deseleccionaron todo, restauramos todas las columnas
             st.session_state.columnas_seleccionadas = todas_columnas
 
-        # Aplicar el filtro de filas antes de seleccionar las columnas visibles.
-        if columna_filtro != _SIN_FILTRO and valor_filtro != _TODOS:
-            mascara_filas = df_cargado[columna_filtro].astype(str).eq(str(valor_filtro))
-            df_filas = df_cargado.loc[mascara_filas]
-        else:
-            df_filas = df_cargado
-
-        # DataFrame con solo las filas y columnas seleccionadas.
         columnas_a_mostrar = columnas_elegidas if columnas_validas else todas_columnas
-        df_filtrado = df_filas.loc[:, columnas_a_mostrar]
+        df_filtrado = _obtener_subconjunto(
+            df_cargado,
+            columnas_a_mostrar,
+            columna_filtro,
+            valor_filtro,
+        )
         firma_filtro = _crear_firma_filtro(
             columnas_a_mostrar,
             columna_filtro,

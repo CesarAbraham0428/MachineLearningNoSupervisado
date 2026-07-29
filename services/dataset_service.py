@@ -275,6 +275,17 @@ def _detectar_outliers_iqr(serie: pd.Series) -> int:
     return int(mascara.sum())
 
 
+def _es_escala_likert(serie: pd.Series) -> bool:
+    """Identifica escalas ordinales enteras de 1 a 5 que no deben winsorizarse."""
+    valores = serie.dropna()
+    if valores.empty:
+        return False
+    return bool(
+        valores.between(1, 5).all()
+        and np.isclose(valores.to_numpy(dtype=float), valores.round()).all()
+    )
+
+
 def diagnosticar_calidad(df: pd.DataFrame) -> DiagnosticoCalidad:
     """Analiza la calidad de un DataFrame genérico y devuelve un diagnóstico.
 
@@ -297,6 +308,8 @@ def diagnosticar_calidad(df: pd.DataFrame) -> DiagnosticoCalidad:
 
     outliers: dict = {}
     for col in columnas_numericas:
+        if _es_escala_likert(df[col]):
+            continue
         cantidad = _detectar_outliers_iqr(df[col])
         if cantidad > 0:
             outliers[col] = cantidad
@@ -382,6 +395,8 @@ def limpiar_dataset(df: pd.DataFrame) -> ResultadoLimpieza:
     outliers_tratados = 0
     for col in columnas_numericas:
         serie = df_trabajo[col]
+        if _es_escala_likert(serie):
+            continue
         q1 = serie.quantile(0.25)
         q3 = serie.quantile(0.75)
         riq = q3 - q1

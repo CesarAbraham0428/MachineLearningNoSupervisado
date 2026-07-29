@@ -8,6 +8,8 @@ from services.dataset_service import (
     DIMENSIONES_BIG_FIVE,
     ErrorDatos,
     ServicioConjuntoDatos,
+    diagnosticar_calidad,
+    limpiar_dataset,
 )
 from utils.validators import validar_conjunto_datos
 
@@ -76,6 +78,22 @@ class PruebasServicioConjuntoDatos(unittest.TestCase):
 
         with self.assertRaisesRegex(ErrorDatos, "faltan preguntas"):
             self.servicio.preprocesar(datos)
+
+    def test_limpieza_no_modifica_escala_likert_valida(self):
+        datos = pd.DataFrame(
+            {
+                "Id": list("ABCDEFGHIJ"),
+                "Likert": [1, 3, 3, 3, 3, 4, 4, 4, 4, 5],
+                "Medicion": [10, 11, 10, 12, 11, 10, 12, 11, 10, 100],
+            }
+        )
+
+        diagnostico = diagnosticar_calidad(datos)
+        resultado = limpiar_dataset(datos)
+
+        self.assertNotIn("Likert", diagnostico.outliers_por_columna)
+        self.assertTrue(resultado.dataset_limpio["Likert"].equals(datos["Likert"]))
+        self.assertEqual(resultado.outliers_tratados, 1)
 
 
 if __name__ == "__main__":
