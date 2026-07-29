@@ -15,6 +15,10 @@ from services.dataset_service import (
 )
 
 
+_SIN_FILTRO = "Sin filtro"
+_TODOS = "Todos"
+
+
 
 
 def _inicializar_estado() -> None:
@@ -31,6 +35,8 @@ def _inicializar_estado() -> None:
         "modelo_entrenado": False,
         "modelos_guardados": [],
         "columnas_seleccionadas": [],
+        "dataframe_filtrado": None,
+        "filtro_calidad": None,
     }
     for clave, valor in valores_iniciales.items():
         if clave not in st.session_state:
@@ -48,6 +54,26 @@ def _limpiar_estado_dataset() -> None:
     st.session_state.pagina_actual = 1
     st.session_state.mostrar_carga = True
     st.session_state.columnas_seleccionadas = []
+    st.session_state.dataframe_filtrado = None
+    st.session_state.filtro_calidad = None
+
+
+def _detectar_columnas_categoricas(df: pd.DataFrame) -> list[str]:
+    """Devuelve columnas categóricas con cardinalidad útil para filtrar filas."""
+    candidatas = []
+    for columna in df.columns:
+        valores_unicos = df[columna].nunique(dropna=True)
+        es_numerica = pd.api.types.is_numeric_dtype(df[columna])
+        if not es_numerica and 2 <= valores_unicos <= 60:
+            candidatas.append(columna)
+    return candidatas
+
+
+def _crear_firma_filtro(
+    columnas: list[str], columna_filtro: str, valor_filtro: object
+) -> tuple[tuple[str, ...], str, str]:
+    """Identifica el subconjunto que se está mostrando y diagnosticando."""
+    return tuple(map(str, columnas)), str(columna_filtro), str(valor_filtro)
 
 
 
@@ -208,6 +234,12 @@ def _renderizar_carga() -> None:
         st.session_state.pagina_actual = 1
         st.session_state.mostrar_carga = False
         st.session_state.columnas_seleccionadas = []
+        st.session_state.dataframe_filtrado = None
+        st.session_state.filtro_calidad = None
+        st.session_state.resultado_limpieza = None
+        st.session_state.dataset_limpio = None
+        st.session_state["sel_columna_filtro"] = _SIN_FILTRO
+        st.session_state["sel_valor_filtro"] = _TODOS
         st.toast("Dataset cargado correctamente")
         st.rerun()
 
@@ -314,7 +346,10 @@ def _renderizar_fila_calidad(etiqueta: str, valor: str, clase_color: str = "") -
     )
 
 
-def _renderizar_validacion_limpieza(df: pd.DataFrame) -> None:
+def _renderizar_validacion_limpieza(
+    df: pd.DataFrame,
+    firma_filtro: tuple[tuple[str, ...], str, str] | None = None,
+) -> None:
     """Renderiza el panel de calidad del dataset y el botón de limpieza (RF-05 a RF-07).
 
     Muestra automáticamente:
@@ -325,10 +360,19 @@ def _renderizar_validacion_limpieza(df: pd.DataFrame) -> None:
     - Reporte de la limpieza ejecutada (RF-07).
 
     Args:
-        df: DataFrame original cargado (nunca se modifica).
+        df: subconjunto activo que se muestra en la tabla (nunca se modifica).
+        firma_filtro: identificador de las filas y columnas que originaron el
+            diagnóstico actual.
     """
-    diagnostico: DiagnosticoCalidad = diagnosticar_calidad(df)
-    resultado: ResultadoLimpieza | None = st.session_state.resultado_limpieza
+    resultado_guardado: ResultadoLimpieza | None = st.session_state.resultado_limpieza
+    resultado = (
+        resultado_guardado
+        if resultado_guardado is not None
+        and st.session_state.get("filtro_calidad") == firma_filtro
+        else None
+    )
+    df_diagnostico = resultado.dataset_limpio if resultado is not None else df
+    diagnostico: DiagnosticoCalidad = diagnosticar_calidad(df_diagnostico)
 
     with st.container(border=True, key="quality-panel"):
         # ── Encabezado ──────────────────────────────────────────────────────
@@ -400,10 +444,10 @@ def _renderizar_validacion_limpieza(df: pd.DataFrame) -> None:
                     width="stretch",
                 ):
                     with st.spinner("Limpiando dataset…"):
-                        df_original = st.session_state.dataset_original
-                        res = limpiar_dataset(df_original)
+                        res = limpiar_dataset(df)
                     st.session_state.dataset_limpio = res.dataset_limpio
                     st.session_state.resultado_limpieza = res
+                    st.session_state.filtro_calidad = firma_filtro
                     st.toast("Dataset limpiado correctamente")
                     st.rerun()
             with col_info:
@@ -452,6 +496,7 @@ def renderizar_vista_datos() -> None:
 
 
     todas_columnas = list(df_cargado.columns)
+    columnas_categoricas = _detectar_columnas_categoricas(df_cargado)
 
     # Sincronizar selección con el estado de sesión; descartar columnas que ya no existen
     seleccion_previa = [
@@ -519,6 +564,39 @@ def renderizar_vista_datos() -> None:
             help="Elige las columnas que deseas visualizar. Se requieren mínimo 2 columnas para realizar clustering.",
         )
 
+        col_filtro, col_valor = st.columns(2)
+        with col_filtro:
+            if columnas_categoricas:
+                columna_filtro = st.selectbox(
+                    "Filtrar filas por columna",
+                    options=[_SIN_FILTRO] + columnas_categoricas,
+                    key="sel_columna_filtro",
+                    help="Selecciona una columna categórica, por ejemplo Comuna, para revisar solo sus registros.",
+                )
+            else:
+                columna_filtro = _SIN_FILTRO
+                st.caption("Sin columnas categóricas para filtrar filas")
+
+        with col_valor:
+            if columna_filtro == _SIN_FILTRO:
+                valor_filtro = _TODOS
+                st.caption("Selecciona una columna para filtrar filas")
+            else:
+                valores_unicos = [_TODOS] + sorted(
+                    {
+                        str(valor)
+                        for valor in df_cargado[columna_filtro].dropna().unique()
+                    },
+                    key=str,
+                )
+                if st.session_state.get("sel_valor_filtro") not in valores_unicos:
+                    st.session_state["sel_valor_filtro"] = _TODOS
+                valor_filtro = st.selectbox(
+                    "Valor",
+                    options=valores_unicos,
+                    key="sel_valor_filtro",
+                )
+
         # Validar mínimo 2 columnas para clustering
         columnas_validas = len(columnas_elegidas) >= 2
         if columnas_elegidas and not columnas_validas:
@@ -536,9 +614,33 @@ def renderizar_vista_datos() -> None:
             # Si deseleccionaron todo, restauramos todas las columnas
             st.session_state.columnas_seleccionadas = todas_columnas
 
-        # DataFrame con solo las columnas seleccionadas (o todas si no hay selección válida)
+        # Aplicar el filtro de filas antes de seleccionar las columnas visibles.
+        if columna_filtro != _SIN_FILTRO and valor_filtro != _TODOS:
+            mascara_filas = df_cargado[columna_filtro].astype(str).eq(str(valor_filtro))
+            df_filas = df_cargado.loc[mascara_filas]
+        else:
+            df_filas = df_cargado
+
+        # DataFrame con solo las filas y columnas seleccionadas.
         columnas_a_mostrar = columnas_elegidas if columnas_validas else todas_columnas
-        df_filtrado = df_cargado[columnas_a_mostrar]
+        df_filtrado = df_filas.loc[:, columnas_a_mostrar]
+        firma_filtro = _crear_firma_filtro(
+            columnas_a_mostrar,
+            columna_filtro,
+            valor_filtro,
+        )
+
+        # Un resultado de limpieza solo es válido para el subconjunto que lo
+        # originó. Si cambia cualquier filtro, se descarta para evitar mostrar
+        # métricas o un estado de calidad pertenecientes a otra selección.
+        if (
+            st.session_state.get("filtro_calidad") is not None
+            and st.session_state.get("filtro_calidad") != firma_filtro
+        ):
+            st.session_state.dataset_limpio = None
+            st.session_state.resultado_limpieza = None
+            st.session_state.filtro_calidad = None
+        st.session_state.dataframe_filtrado = df_filtrado.copy()
 
         nombre_archivo = escape(str(st.session_state.nombre_archivo or "Dataset sin nombre"))
         fecha_carga = escape(str(st.session_state.fecha_carga or "Sin fecha"))
@@ -550,18 +652,29 @@ def renderizar_vista_datos() -> None:
             f'<div>{fecha_carga}</div></div></div>'
         )
 
+        notas_filtro = []
         if columnas_validas and len(columnas_elegidas) < len(todas_columnas):
             excluidas = len(todas_columnas) - len(columnas_elegidas)
-            st.html(
-                '<div class="cl-filter-note">'
+            notas_filtro.append(
                 f"Columnas visibles: <strong>{len(columnas_elegidas)}</strong> de "
                 f"<strong>{len(todas_columnas)}</strong> · "
-                f"{excluidas} columna(s) ocultada(s)</div>"
+                f"{excluidas} columna(s) ocultada(s)"
+            )
+        if columna_filtro != _SIN_FILTRO and valor_filtro != _TODOS:
+            notas_filtro.append(
+                f"Filas: <strong>{len(df_filtrado):,}</strong> de "
+                f"<strong>{len(df_cargado):,}</strong> · "
+                f"<strong>{escape(str(columna_filtro))}</strong> = "
+                f"<strong>{escape(str(valor_filtro))}</strong>"
+            )
+        if notas_filtro:
+            st.html(
+                '<div class="cl-filter-note">'
+                + " · ".join(notas_filtro)
+                + "</div>"
             )
 
         _renderizar_tabla_paginada(df_filtrado)
 
     # RF-05 / RF-06 / RF-07: panel de calidad debajo del panel de datos
-    _renderizar_validacion_limpieza(df_cargado)
-
-
+    _renderizar_validacion_limpieza(df_filtrado, firma_filtro)
