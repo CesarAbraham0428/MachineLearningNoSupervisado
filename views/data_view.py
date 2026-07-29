@@ -15,7 +15,6 @@ from services.dataset_service import (
 )
 
 
-_SIN_FILTRO = "Sin filtro"
 
 
 def _inicializar_estado() -> None:
@@ -31,6 +30,7 @@ def _inicializar_estado() -> None:
         "mostrar_carga": False,
         "modelo_entrenado": False,
         "modelos_guardados": [],
+        "columnas_seleccionadas": [],
     }
     for clave, valor in valores_iniciales.items():
         if clave not in st.session_state:
@@ -47,6 +47,7 @@ def _limpiar_estado_dataset() -> None:
     st.session_state.fecha_carga = None
     st.session_state.pagina_actual = 1
     st.session_state.mostrar_carga = True
+    st.session_state.columnas_seleccionadas = []
 
 
 
@@ -68,16 +69,6 @@ def _cargar_archivo(archivo_subido) -> tuple[pd.DataFrame | None, str]:
     except Exception as error:  # pragma: no cover - depende del archivo elegido
         return None, f"Error al leer el archivo: {error}"
 
-
-def _detectar_columnas_categoricas(df: pd.DataFrame) -> list[str]:
-    """Devuelve columnas de texto con cardinalidad razonable para filtrar."""
-    candidatas = []
-    for col in df.columns:
-        valores_unicos = df[col].nunique()
-        es_numerica = pd.api.types.is_numeric_dtype(df[col])
-        if not es_numerica and 2 <= valores_unicos <= 60:
-            candidatas.append(col)
-    return candidatas
 
 
 def _exportar_excel(df: pd.DataFrame) -> bytes:
@@ -216,6 +207,7 @@ def _renderizar_carga() -> None:
         st.session_state.fecha_carga = datetime.now().strftime("%d/%m/%Y %H:%M")
         st.session_state.pagina_actual = 1
         st.session_state.mostrar_carga = False
+        st.session_state.columnas_seleccionadas = []
         st.toast("Dataset cargado correctamente")
         st.rerun()
 
@@ -459,45 +451,42 @@ def renderizar_vista_datos() -> None:
         return
 
 
-    columnas_categoricas = _detectar_columnas_categoricas(df_cargado)
-    columna_filtro = _SIN_FILTRO
-    valor_filtro = "Todos"
+    todas_columnas = list(df_cargado.columns)
+
+    # Sincronizar selección con el estado de sesión; descartar columnas que ya no existen
+    seleccion_previa = [
+        c for c in st.session_state.columnas_seleccionadas if c in todas_columnas
+    ]
+    # Si no hay selección previa, usar todas las columnas como estado inicial
+    if not seleccion_previa:
+        seleccion_previa = todas_columnas
+        st.session_state.columnas_seleccionadas = todas_columnas
+
+    # Calcular df_filtrado ANTES del contenedor usando la selección persistida,
+    # para que el botón de exportar ya tenga el dataset correcto al renderizarse.
+    columnas_persistidas = st.session_state.columnas_seleccionadas
+    columnas_persistidas_validas = len(columnas_persistidas) >= 2
+    columnas_para_exportar = columnas_persistidas if columnas_persistidas_validas else todas_columnas
+    df_para_exportar = df_cargado[columnas_para_exportar]
 
     with st.container(border=True, key="dataset-panel"):
-        col_titulo, col_columna, col_valor, col_exportar, col_borrar = st.columns(
-            [2.0, 1.25, 1.25, 0.75, 0.75],
+        col_titulo, col_exportar, col_borrar = st.columns(
+            [4.5, 0.75, 0.75],
             vertical_alignment="bottom",
         )
         with col_titulo:
             st.subheader("Conjunto de datos")
             st.caption("Consulta y administra la información importada.")
 
-        with col_columna:
-            if columnas_categoricas:
-                columna_filtro = st.selectbox(
-                    "Filtrar por columna",
-                    options=[_SIN_FILTRO] + columnas_categoricas,
-                    key="sel_columna_filtro",
-                )
-            else:
-                st.caption("Sin columnas categóricas")
-
-        with col_valor:
-            if columna_filtro != _SIN_FILTRO:
-                valores_unicos = ["Todos"] + sorted(
-                    df_cargado[columna_filtro].dropna().unique().tolist(),
-                    key=str,
-                )
-                valor_filtro = st.selectbox(
-                    "Categoría",
-                    options=valores_unicos,
-                    key="sel_valor_filtro",
-                )
-            else:
-                st.caption("Selecciona una columna")
-
         with col_exportar:
-            datos_descarga, nombre_descarga, mime_descarga = _preparar_descarga(df_cargado)
+            datos_descarga, nombre_descarga, mime_descarga = _preparar_descarga(df_para_exportar)
+            columnas_exportadas = len(columnas_para_exportar)
+            total_columnas = len(todas_columnas)
+            etiqueta_ayuda = (
+                f"Exporta las {columnas_exportadas} columnas visibles de {total_columnas} totales"
+                if columnas_exportadas < total_columnas
+                else "Exporta el dataset completo en Excel o CSV"
+            )
             st.download_button(
                 label="Exportar",
                 data=datos_descarga,
@@ -505,7 +494,7 @@ def renderizar_vista_datos() -> None:
                 mime=mime_descarga,
                 key="btn_exportar",
                 width="stretch",
-                help="Descarga el dataset actual en Excel o CSV según los motores disponibles",
+                help=etiqueta_ayuda,
             )
 
         with col_borrar:
@@ -520,11 +509,36 @@ def renderizar_vista_datos() -> None:
                 st.toast("Dataset eliminado")
                 st.rerun()
 
-        df_filtrado = (
-            df_cargado[df_cargado[columna_filtro].astype(str) == str(valor_filtro)]
-            if columna_filtro != _SIN_FILTRO and valor_filtro != "Todos"
-            else df_cargado
+        # ── Selector de columnas ──────────────────────────────────────────
+        columnas_elegidas = st.multiselect(
+            "Filtrar columnas a mostrar",
+            options=todas_columnas,
+            default=seleccion_previa,
+            placeholder="Selecciona al menos 2 columnas…",
+            key="ms_columnas_filtro",
+            help="Elige las columnas que deseas visualizar. Se requieren mínimo 2 columnas para realizar clustering.",
         )
+
+        # Validar mínimo 2 columnas para clustering
+        columnas_validas = len(columnas_elegidas) >= 2
+        if columnas_elegidas and not columnas_validas:
+            st.warning(
+                "⚠ Se requieren **mínimo 2 columnas** para que el algoritmo de "
+                "clustering (ML no supervisado) pueda generar al menos 2 grupos. "
+                "Selecciona al menos una columna adicional.",
+                icon=None,
+            )
+
+        # Persistir selección en session_state para el siguiente rerun
+        if columnas_elegidas:
+            st.session_state.columnas_seleccionadas = columnas_elegidas
+        else:
+            # Si deseleccionaron todo, restauramos todas las columnas
+            st.session_state.columnas_seleccionadas = todas_columnas
+
+        # DataFrame con solo las columnas seleccionadas (o todas si no hay selección válida)
+        columnas_a_mostrar = columnas_elegidas if columnas_validas else todas_columnas
+        df_filtrado = df_cargado[columnas_a_mostrar]
 
         nombre_archivo = escape(str(st.session_state.nombre_archivo or "Dataset sin nombre"))
         fecha_carga = escape(str(st.session_state.fecha_carga or "Sin fecha"))
@@ -536,12 +550,13 @@ def renderizar_vista_datos() -> None:
             f'<div>{fecha_carga}</div></div></div>'
         )
 
-        if columna_filtro != _SIN_FILTRO and valor_filtro != "Todos":
+        if columnas_validas and len(columnas_elegidas) < len(todas_columnas):
+            excluidas = len(todas_columnas) - len(columnas_elegidas)
             st.html(
                 '<div class="cl-filter-note">'
-                f"Filtro activo · <strong>{escape(str(columna_filtro))}</strong> = "
-                f"<strong>{escape(str(valor_filtro))}</strong> · "
-                f"{len(df_filtrado):,} de {len(df_cargado):,} registros</div>"
+                f"Columnas visibles: <strong>{len(columnas_elegidas)}</strong> de "
+                f"<strong>{len(todas_columnas)}</strong> · "
+                f"{excluidas} columna(s) ocultada(s)</div>"
             )
 
         _renderizar_tabla_paginada(df_filtrado)
