@@ -1,0 +1,169 @@
+/*
+   ClusterLab — componentes.css
+   Botones, badges, alertas, expanders y controles nativos de Streamlit.
+   Este archivo se carga en TODAS las pestañas.
+*/
+
+/* ── Botones primarios ──────────────────────────────────────────────────────── */
+[data-testid="baseButton-primary"],
+button[kind="primary"] {
+    background: var(--cl-blue) !important;
+    border: 1px solid #3a99ff !important;
+    color: #ffffff !important;
+    box-shadow: none !important;
+}
+
+[data-testid="baseButton-primary"]:hover,
+button[kind="primary"]:hover {
+    background: #3a99ff !important;
+    border-color: #67b1ff !important;
+}
+
+/* ── Botones generales ──────────────────────────────────────────────────────── */
+.stButton > button,
+.stDownloadButton > button {
+    min-height: 38px;
+    border-radius: 8px !important;
+    border: 1px solid var(--cl-border-strong) !important;
+    background: transparent !important;
+    color: var(--cl-text) !important;
+    box-shadow: none !important;
+    font-size: 0.84rem;
+    font-weight: 600;
+    transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.stButton > button:hover,
+.stDownloadButton > button:hover {
+    background: rgba(35, 136, 255, 0.1) !important;
+    border-color: var(--cl-blue) !important;
+    color: #b8d9ff !important;
+}
+
+.stButton > button[kind="primary"],
+.stButton > button[data-testid="stBaseButton-primary"] {
+    background: var(--cl-blue) !important;
+    border-color: #3a99ff !important;
+    color: #ffffff !important;
+}
+
+.stButton > button[kind="primary"]:hover,
+.stButton > button[data-testid="stBaseButton-primary"]:hover {
+    background: #3a99ff !important;
+    border-color: #67b1ff !important;
+}
+
+.stButton > button:focus-visible,
+.stDownloadButton > button:focus-visible,
+[data-testid="stSegmentedControl"] button:focus-visible {
+    outline: 2px solid #7fc0ff !important;
+    outline-offset: 2px;
+}
+
+/* ── Badges ─────────────────────────────────────────────────────────────────── */
+.cl-badge {
+    display: inline-flex;
+    align-items: center;
+    margin-top: 7px;
+    padding: 3px 9px;
+    border-radius: 4px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    line-height: 1.1;
+}
+
+.cl-badge--green {
+    background: #0d6b49;
+    color: #d4ffea;
+}
+
+.cl-badge--amber {
+    background: #f0a313;
+    color: #1b170b;
+}
+
+/* ── Superficies con borde (containers) ─────────────────────────────────────── */
+[data-testid="stVerticalBlockBorderWrapper"] {
+    background: rgba(7, 23, 42, 0.84) !important;
+    border-color: var(--cl-border) !important;
+    border-radius: 12px !important;
+}
+
+[data-testid="stVerticalBlockBorderWrapper"] h2,
+[data-testid="stVerticalBlockBorderWrapper"] h3 {
+    margin-top: 0;
+    color: var(--cl-text);
+    letter-spacing: -0.02em;
+}
+
+[data-testid="stVerticalBlockBorderWrapper"] p,
+[data-testid="stVerticalBlockBorderWrapper"] label {
+    color: var(--cl-muted);
+}
+
+[data-testid="stVerticalBlockBorderWrapper"] > div {
+    min-width: 0;
+}
+
+/* ── Controles nativos ──────────────────────────────────────────────────────── */
+[data-testid="stSelectbox"] label,
+[data-testid="stFileUploader"] label {
+    color: var(--cl-muted) !important;
+    font-size: 0.74rem !important;
+    font-weight: 600 !important;
+}
+
+[data-testid="stSelectbox"] > div > div,
+[data-testid="stNumberInput"] > div > div {
+    border-color: var(--cl-border-strong) !important;
+    background: #0b1c30 !important;
+}
+
+[data-testid="stFileUploader"] {
+    border-color: var(--cl-border-strong) !important;
+    background: #091b30 !important;
+}
+
+[data-testid="stExpander"] summary > span > span:first-child,
+[data-testid="stFileUploader"] [data-testid="stIconMaterial"] {
+    display: none !important;
+}
+
+[data-testid="stExpander"] {
+    margin-bottom: 16px;
+    border-color: var(--cl-border) !important;
+    background: #07172a !important;
+}
+
+[data-testid="stAlert"] {
+    border-radius: 8px !important;
+}
+
+/* ── Estados vacíos ─────────────────────────────────────────────────────────── */
+.st-key-empty-data-state,
+.st-key-empty-state-bar_chart,
+.st-key-empty-state-model_training,
+.st-key-empty-state-query_stats,
+.st-key-empty-state-inventory_2 {
+    min-height: 190px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+
+.st-key-empty-data-state [data-testid="stMarkdownContainer"] p:first-child,
+.st-key-empty-state-bar_chart [data-testid="stMarkdownContainer"] p:first-child,
+.st-key-empty-state-model_training [data-testid="stMarkdownContainer"] p:first-child,
+.st-key-empty-state-query_stats [data-testid="stMarkdownContainer"] p:first-child,
+.st-key-empty-state-inventory_2 [data-testid="stMarkdownContainer"] p:first-child {
+    color: var(--cl-blue);
+    font-size: 2.1rem;
+}
+
+.cl-empty-icon {
+    color: var(--cl-blue);
+    font-size: 2rem;
+    font-weight: 600;
+    line-height: 1;
+}

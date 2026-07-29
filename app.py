@@ -21,10 +21,33 @@ _SECCIONES = (
 )
 
 
+_DIR_ESTILOS = pathlib.Path(__file__).parent / "assets" / "styles"
+
+
 def _cargar_estilos() -> None:
-    """Carga los estilos estructurales específicos de la aplicación."""
-    ruta_css = pathlib.Path(__file__).parent / "assets" / "styles.css"
-    st.html(f"<style>{ruta_css.read_text(encoding='utf-8')}</style>")
+    """Carga y concatena todos los archivos CSS de la carpeta de estilos.
+
+    Esto mantiene la organización de los estilos en archivos pequeños y dedicados
+    por pestaña/componente, pero asegura que toda la interfaz conserve sus estilos
+    sin importar qué pestaña esté activa.
+    """
+    archivos_css = [
+        "base.css",
+        "componentes.css",
+        "datos.css",
+        "estadisticas.css",
+        "entrenamiento.css",
+        "resultados.css",
+        "modelos.css",
+    ]
+    
+    css_completo = []
+    for archivo in archivos_css:
+        ruta = _DIR_ESTILOS / archivo
+        if ruta.exists():
+            css_completo.append(ruta.read_text(encoding="utf-8"))
+            
+    st.html(f"<style>{''.join(css_completo)}</style>")
 
 
 def _renderizar_navegacion() -> int:
