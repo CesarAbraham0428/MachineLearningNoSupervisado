@@ -37,6 +37,19 @@ def _inicializar_estado() -> None:
             st.session_state[clave] = valor
 
 
+def _limpiar_estado_dataset() -> None:
+    """Elimina el dataset activo del estado y vuelve a habilitar la opción de carga."""
+    st.session_state.dataframe_cargado = None
+    st.session_state.dataset_original = None
+    st.session_state.dataset_limpio = None
+    st.session_state.resultado_limpieza = None
+    st.session_state.nombre_archivo = None
+    st.session_state.fecha_carga = None
+    st.session_state.pagina_actual = 1
+    st.session_state.mostrar_carga = True
+
+
+
 def _cargar_archivo(archivo_subido) -> tuple[pd.DataFrame | None, str]:
     """Valida y carga un archivo CSV o Excel."""
     nombre = archivo_subido.name.lower()
@@ -105,27 +118,16 @@ def _icono_svg(nombre: str) -> str:
 
 
 def renderizar_encabezado() -> None:
-    """Renderiza el encabezado global y la acción primaria de carga."""
+    """Renderiza el encabezado global del dashboard."""
     _inicializar_estado()
-    col_titulo, col_accion = st.columns([4.5, 1], vertical_alignment="top")
+    st.markdown(
+        '<div class="cl-hero">'
+        '<h1 class="cl-hero-title">Dashboard de procesamiento</h1>'
+        '<p class="cl-hero-subtitle">Administra los datos, el entrenamiento y los resultados desde un solo lugar.</p>'
+        "</div>",
+        unsafe_allow_html=True,
+    )
 
-    with col_titulo:
-        st.markdown(
-            '<div class="cl-hero">'
-            '<h1 class="cl-hero-title">Dashboard de procesamiento</h1>'
-            '<p class="cl-hero-subtitle">Administra los datos, el entrenamiento y los resultados desde un solo lugar.</p>'
-            "</div>",
-            unsafe_allow_html=True,
-        )
-
-    with col_accion:
-        if st.button(
-            "Cargar conjunto de datos",
-            key="btn_abrir_carga",
-            type="primary",
-            width="stretch",
-        ):
-            st.session_state.mostrar_carga = True
 
 
 def renderizar_metricas() -> None:
@@ -191,7 +193,12 @@ def _renderizar_carga() -> None:
         )
 
         if archivo is None:
+            if df_cargado is not None:
+                if st.button("Cancelar", key="btn_cancelar_carga", type="secondary"):
+                    st.session_state.mostrar_carga = False
+                    st.rerun()
             return
+
 
         with st.spinner("Cargando y validando archivo…"):
             df_nuevo, error = _cargar_archivo(archivo)
@@ -250,7 +257,7 @@ def _renderizar_paginacion(pagina_actual: int, total_paginas: int) -> None:
     """Renderiza los controles de paginación con estados accesibles."""
     with st.container(horizontal=True, horizontal_alignment="center", gap="small"):
         if st.button(
-            "«",
+            "Primera",
             key="pag_primera",
             disabled=pagina_actual == 1,
             help="Primera página",
@@ -260,7 +267,7 @@ def _renderizar_paginacion(pagina_actual: int, total_paginas: int) -> None:
             st.session_state.pagina_actual = 1
             st.rerun()
         if st.button(
-            "‹",
+            ":material/chevron_left:",
             key="pag_anterior",
             disabled=pagina_actual == 1,
             help="Página anterior",
@@ -270,10 +277,20 @@ def _renderizar_paginacion(pagina_actual: int, total_paginas: int) -> None:
             st.session_state.pagina_actual = max(1, pagina_actual - 1)
             st.rerun()
 
-        st.html(f'<span class="cl-page-current" aria-current="page">{pagina_actual}</span>')
+        # Renderizar todas las páginas como botones
+        for pagina_num in range(1, total_paginas + 1):
+            es_pagina_actual = (pagina_num == pagina_actual)
+            if st.button(
+                str(pagina_num),
+                key=f"pag_num_{pagina_num}",
+                type="primary" if es_pagina_actual else "secondary",
+                width="content",
+            ):
+                st.session_state.pagina_actual = pagina_num
+                st.rerun()
 
         if st.button(
-            "›",
+            ":material/chevron_right:",
             key="pag_siguiente",
             disabled=pagina_actual == total_paginas,
             help="Página siguiente",
@@ -283,7 +300,7 @@ def _renderizar_paginacion(pagina_actual: int, total_paginas: int) -> None:
             st.session_state.pagina_actual = min(total_paginas, pagina_actual + 1)
             st.rerun()
         if st.button(
-            "»",
+            "Última",
             key="pag_ultima",
             disabled=pagina_actual == total_paginas,
             help="Última página",
@@ -428,19 +445,27 @@ def renderizar_vista_datos() -> None:
 
     df_cargado: pd.DataFrame | None = st.session_state.dataframe_cargado
     if df_cargado is None:
-        with st.container(border=True, key="empty-data-state"):
-            st.html('<div class="cl-empty-icon">↑</div>')
-            st.subheader("Aún no hay datos cargados")
-            st.caption("Usa el botón superior para cargar un CSV o Excel y comenzar el análisis.")
+        if not st.session_state.mostrar_carga:
+            with st.container(border=True, key="empty-data-state"):
+                st.subheader("Aún no hay datos cargados")
+                st.caption("Haz clic en el botón a continuación para seleccionar un archivo CSV o Excel.")
+                if st.button(
+                    "Cargar conjunto de datos",
+                    key="btn_abrir_carga",
+                    type="primary",
+                ):
+                    st.session_state.mostrar_carga = True
+                    st.rerun()
         return
+
 
     columnas_categoricas = _detectar_columnas_categoricas(df_cargado)
     columna_filtro = _SIN_FILTRO
     valor_filtro = "Todos"
 
     with st.container(border=True, key="dataset-panel"):
-        col_titulo, col_columna, col_valor, col_exportar = st.columns(
-            [2.4, 1.35, 1.35, 0.85],
+        col_titulo, col_columna, col_valor, col_exportar, col_borrar = st.columns(
+            [2.0, 1.25, 1.25, 0.75, 0.75],
             vertical_alignment="bottom",
         )
         with col_titulo:
@@ -483,6 +508,18 @@ def renderizar_vista_datos() -> None:
                 help="Descarga el dataset actual en Excel o CSV según los motores disponibles",
             )
 
+        with col_borrar:
+            if st.button(
+                "Borrar dataset",
+                key="btn_borrar_dataset",
+                type="secondary",
+                width="stretch",
+                help="Elimina el conjunto de datos activo y vuelve a mostrar el apartado de carga",
+            ):
+                _limpiar_estado_dataset()
+                st.toast("Dataset eliminado")
+                st.rerun()
+
         df_filtrado = (
             df_cargado[df_cargado[columna_filtro].astype(str) == str(valor_filtro)]
             if columna_filtro != _SIN_FILTRO and valor_filtro != "Todos"
@@ -511,3 +548,5 @@ def renderizar_vista_datos() -> None:
 
     # RF-05 / RF-06 / RF-07: panel de calidad debajo del panel de datos
     _renderizar_validacion_limpieza(df_cargado)
+
+

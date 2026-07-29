@@ -33,6 +33,14 @@ button[kind="primary"]:hover {
     transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
 }
 
+.stButton button *,
+.stDownloadButton button * {
+    color: inherit !important;
+    font-size: inherit !important;
+    font-weight: inherit !important;
+}
+
+
 .stButton > button:hover,
 .stDownloadButton > button:hover {
     background: rgba(35, 136, 255, 0.1) !important;
@@ -147,10 +155,27 @@ button[kind="primary"]:hover {
 .st-key-empty-state-inventory_2 {
     min-height: 190px;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
     text-align: center;
+    gap: 12px;
+    padding: 24px;
 }
+
+.st-key-empty-data-state div[data-testid="stButton"] {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+}
+
+.st-key-empty-data-state button {
+    width: auto;
+    min-width: 200px;
+    max-width: 250px;
+    margin: 4px auto 0;
+}
+
 
 .st-key-empty-data-state [data-testid="stMarkdownContainer"] p:first-child,
 .st-key-empty-state-bar_chart [data-testid="stMarkdownContainer"] p:first-child,
