@@ -23,7 +23,10 @@ _ETIQUETAS_LIKERT = {
 
 
 def _obtener_datos_activos() -> pd.DataFrame | None:
-    """Da prioridad al resultado filtrado cuando la vista de datos lo exponga."""
+    """Da prioridad al dataset limpio; si no existe, usa el cargado o el filtrado."""
+    dataset_limpio = st.session_state.get("dataset_limpio")
+    if dataset_limpio is not None:
+        return dataset_limpio
     return st.session_state.get(
         "dataframe_filtrado", st.session_state.get("dataframe_cargado")
     )

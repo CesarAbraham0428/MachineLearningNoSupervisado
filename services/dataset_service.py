@@ -201,3 +201,204 @@ class ServicioConjuntoDatos:
             columnas_preguntas=tuple(columnas),
             columna_temporal=self.identificar_columna_temporal(datos),
         )
+
+
+# ---------------------------------------------------------------------------
+# RF-05 a RF-08 — Diagnóstico de calidad y limpieza automática del dataset
+# ---------------------------------------------------------------------------
+
+import numpy as np
+from dataclasses import field
+
+
+@dataclass(frozen=True)
+class DiagnosticoCalidad:
+    """Resultado del análisis de calidad de un DataFrame genérico.
+
+    Attributes:
+        num_filas: Número total de filas del dataset.
+        num_columnas: Número total de columnas.
+        num_columnas_numericas: Columnas con dtype numérico.
+        num_columnas_categoricas: Columnas no numéricas.
+        nulos_por_columna: Serie con el conteo de nulos por columna (solo > 0).
+        num_duplicados: Filas completamente duplicadas.
+        outliers_por_columna: Dict columna → cantidad de outliers detectados por IQR.
+    """
+
+    num_filas: int
+    num_columnas: int
+    num_columnas_numericas: int
+    num_columnas_categoricas: int
+    nulos_por_columna: pd.Series
+    num_duplicados: int
+    outliers_por_columna: dict
+
+    @property
+    def total_nulos(self) -> int:
+        """Suma total de valores nulos encontrados."""
+        return int(self.nulos_por_columna.sum())
+
+    @property
+    def total_outliers(self) -> int:
+        """Suma total de outliers detectados en todas las columnas numéricas."""
+        return sum(self.outliers_por_columna.values())
+
+    @property
+    def requiere_limpieza(self) -> bool:
+        """Indica si el dataset tiene algún problema que necesita corrección."""
+        return self.total_nulos > 0 or self.num_duplicados > 0 or self.total_outliers > 0
+
+
+def _detectar_outliers_iqr(serie: pd.Series) -> int:
+    """Cuenta los valores fuera del rango IQR de una Serie numérica.
+
+    Usa el método estándar: límite inferior = Q1 - 1.5·IQR,
+    límite superior = Q3 + 1.5·IQR.
+
+    Args:
+        serie: Serie de pandas con valores numéricos.
+
+    Returns:
+        Cantidad de valores fuera del rango permitido.
+    """
+    serie_limpia = serie.dropna()
+    if serie_limpia.empty:
+        return 0
+    q1 = serie_limpia.quantile(0.25)
+    q3 = serie_limpia.quantile(0.75)
+    riq = q3 - q1
+    if riq == 0:
+        return 0
+    limite_inferior = q1 - 1.5 * riq
+    limite_superior = q3 + 1.5 * riq
+    mascara = (serie_limpia < limite_inferior) | (serie_limpia > limite_superior)
+    return int(mascara.sum())
+
+
+def diagnosticar_calidad(df: pd.DataFrame) -> DiagnosticoCalidad:
+    """Analiza la calidad de un DataFrame genérico y devuelve un diagnóstico.
+
+    Detecta automáticamente:
+    - Valores nulos por columna.
+    - Filas completamente duplicadas.
+    - Outliers en columnas numéricas mediante el método IQR.
+
+    Args:
+        df: DataFrame a diagnosticar. No se modifica.
+
+    Returns:
+        DiagnosticoCalidad con todos los hallazgos.
+    """
+    columnas_numericas = df.select_dtypes(include="number").columns.tolist()
+    columnas_categoricas = df.select_dtypes(exclude="number").columns.tolist()
+
+    nulos = df.isnull().sum()
+    nulos_con_problemas = nulos[nulos > 0]
+
+    outliers: dict = {}
+    for col in columnas_numericas:
+        cantidad = _detectar_outliers_iqr(df[col])
+        if cantidad > 0:
+            outliers[col] = cantidad
+
+    return DiagnosticoCalidad(
+        num_filas=len(df),
+        num_columnas=len(df.columns),
+        num_columnas_numericas=len(columnas_numericas),
+        num_columnas_categoricas=len(columnas_categoricas),
+        nulos_por_columna=nulos_con_problemas,
+        num_duplicados=int(df.duplicated().sum()),
+        outliers_por_columna=outliers,
+    )
+
+
+@dataclass(frozen=True)
+class ResultadoLimpieza:
+    """Resultado de la limpieza automática de un DataFrame.
+
+    Attributes:
+        duplicados_eliminados: Filas duplicadas que se quitaron.
+        nulos_corregidos: Total de celdas nulas imputadas.
+        outliers_tratados: Total de valores winzorizados.
+        filas_finales: Número de filas del dataset limpio.
+        columnas_finales: Número de columnas del dataset limpio.
+        dataset_limpio: DataFrame resultante de la limpieza.
+    """
+
+    duplicados_eliminados: int
+    nulos_corregidos: int
+    outliers_tratados: int
+    filas_finales: int
+    columnas_finales: int
+    dataset_limpio: pd.DataFrame
+
+
+def limpiar_dataset(df: pd.DataFrame) -> ResultadoLimpieza:
+    """Limpia automáticamente un DataFrame aplicando cuatro pasos secuenciales.
+
+    Pasos en orden:
+    1. Eliminar filas completamente duplicadas.
+    2. Imputar nulos en columnas numéricas con la **mediana** de cada columna.
+    3. Imputar nulos en columnas categóricas con la **moda** de cada columna.
+    4. Aplicar **winsorización** (clamping por IQR) en columnas numéricas para
+       tratar outliers sin eliminar filas.
+
+    IMPORTANTE: el DataFrame original `df` nunca se modifica.
+
+    Args:
+        df: DataFrame original. Se trabaja sobre una copia.
+
+    Returns:
+        ResultadoLimpieza con métricas del proceso y el dataset limpio.
+    """
+    df_trabajo = df.copy()
+
+    # 1. Eliminar duplicados
+    filas_antes = len(df_trabajo)
+    df_trabajo = df_trabajo.drop_duplicates()
+    duplicados_eliminados = filas_antes - len(df_trabajo)
+
+    # 2 y 3. Imputar nulos
+    nulos_corregidos = 0
+    columnas_numericas = df_trabajo.select_dtypes(include="number").columns.tolist()
+    columnas_categoricas = df_trabajo.select_dtypes(exclude="number").columns.tolist()
+
+    for col in columnas_numericas:
+        faltantes = df_trabajo[col].isnull().sum()
+        if faltantes > 0:
+            mediana = df_trabajo[col].median()
+            df_trabajo[col] = df_trabajo[col].fillna(mediana)
+            nulos_corregidos += faltantes
+
+    for col in columnas_categoricas:
+        faltantes = df_trabajo[col].isnull().sum()
+        if faltantes > 0:
+            modas = df_trabajo[col].mode(dropna=True)
+            if not modas.empty:
+                df_trabajo[col] = df_trabajo[col].fillna(modas.iloc[0])
+                nulos_corregidos += faltantes
+
+    # 4. Winsorización por IQR en columnas numéricas
+    outliers_tratados = 0
+    for col in columnas_numericas:
+        serie = df_trabajo[col]
+        q1 = serie.quantile(0.25)
+        q3 = serie.quantile(0.75)
+        riq = q3 - q1
+        if riq == 0:
+            continue
+        limite_inf = q1 - 1.5 * riq
+        limite_sup = q3 + 1.5 * riq
+        fuera_de_rango = ((serie < limite_inf) | (serie > limite_sup)).sum()
+        if fuera_de_rango > 0:
+            df_trabajo[col] = serie.clip(lower=limite_inf, upper=limite_sup)
+            outliers_tratados += int(fuera_de_rango)
+
+    return ResultadoLimpieza(
+        duplicados_eliminados=duplicados_eliminados,
+        nulos_corregidos=int(nulos_corregidos),
+        outliers_tratados=outliers_tratados,
+        filas_finales=len(df_trabajo),
+        columnas_finales=len(df_trabajo.columns),
+        dataset_limpio=df_trabajo,
+    )
