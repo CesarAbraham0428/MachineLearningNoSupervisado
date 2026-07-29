@@ -640,6 +640,12 @@ def renderizar_vista_datos() -> None:
             st.session_state.dataset_limpio = None
             st.session_state.resultado_limpieza = None
             st.session_state.filtro_calidad = None
+        if (
+            st.session_state.get("filtro_calidad") == firma_filtro
+            and st.session_state.get("resultado_limpieza") is not None
+            and st.session_state.get("dataset_limpio") is not None
+        ):
+            df_filtrado = st.session_state.dataset_limpio.copy()
         st.session_state.dataframe_filtrado = df_filtrado.copy()
 
         nombre_archivo = escape(str(st.session_state.nombre_archivo or "Dataset sin nombre"))
