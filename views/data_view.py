@@ -30,6 +30,12 @@ def _inicializar_estado() -> None:
         "columnas_seleccionadas": [],
         "dataframe_filtrado": None,
         "filtro_calidad": None,
+        "dataframe_entrenamiento": None,
+        "firma_entrenamiento": None,
+        "dataset_likert": None,
+        "mapeo_likert": {},
+        "firma_likert": None,
+        "columnas_likert": [],
     }
     for clave, valor in valores_iniciales.items():
         if clave not in st.session_state:
@@ -49,6 +55,12 @@ def _limpiar_estado_dataset() -> None:
     st.session_state.columnas_seleccionadas = []
     st.session_state.dataframe_filtrado = None
     st.session_state.filtro_calidad = None
+    st.session_state.dataframe_entrenamiento = None
+    st.session_state.firma_entrenamiento = None
+    st.session_state.dataset_likert = None
+    st.session_state.mapeo_likert = {}
+    st.session_state.firma_likert = None
+    st.session_state.columnas_likert = []
 
 
 def _detectar_columnas_categoricas(df: pd.DataFrame) -> list[str]:
@@ -249,6 +261,12 @@ def _renderizar_carga() -> None:
         st.session_state.columnas_seleccionadas = []
         st.session_state.dataframe_filtrado = None
         st.session_state.filtro_calidad = None
+        st.session_state.dataframe_entrenamiento = None
+        st.session_state.firma_entrenamiento = None
+        st.session_state.dataset_likert = None
+        st.session_state.mapeo_likert = {}
+        st.session_state.firma_likert = None
+        st.session_state.columnas_likert = []
         st.session_state.resultado_limpieza = None
         st.session_state.dataset_limpio = None
         st.session_state["sel_columna_filtro"] = _SIN_FILTRO
@@ -528,6 +546,12 @@ def renderizar_vista_datos() -> None:
             st.session_state.dataset_limpio = None
             st.session_state.resultado_limpieza = None
             st.session_state.filtro_calidad = None
+            st.session_state.dataframe_entrenamiento = None
+            st.session_state.firma_entrenamiento = None
+            st.session_state.dataset_likert = None
+            st.session_state.mapeo_likert = {}
+            st.session_state.firma_likert = None
+            st.session_state.columnas_likert = []
         if (
             st.session_state.get("filtro_calidad") == firma_filtro
             and st.session_state.get("resultado_limpieza") is not None

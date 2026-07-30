@@ -8,8 +8,11 @@ from services.dataset_service import (
     DIMENSIONES_BIG_FIVE,
     ErrorDatos,
     ServicioConjuntoDatos,
+    aplicar_mapeo_likert,
+    detectar_columnas_likert,
     diagnosticar_calidad,
     limpiar_dataset,
+    obtener_valor_likert,
 )
 from utils.validators import validar_conjunto_datos
 
@@ -57,6 +60,73 @@ class PruebasServicioConjuntoDatos(unittest.TestCase):
         self.assertTrue(
             (resultado.respuestas_numericas.iloc[0] == 1).all()
         )
+
+    def test_detecta_variaciones_comunes_de_respuestas_likert(self):
+        datos = pd.DataFrame(
+            {
+                "Pregunta 1": [
+                    "  TOTALMENTE EN DESACUERDO  ",
+                    "Ni de acuerdo ni en desacuerdo",
+                    "5 - Totalmente de acuerdo",
+                ],
+                "Comentario": ["uno", "dos", "tres"],
+            }
+        )
+
+        detectadas = detectar_columnas_likert(datos)
+
+        self.assertEqual(list(detectadas), ["Pregunta 1"])
+        self.assertEqual(
+            [obtener_valor_likert(valor) for valor in detectadas["Pregunta 1"]],
+            [1, 3, 5],
+        )
+
+    def test_aplica_mapeo_automatico_y_no_modifica_el_original(self):
+        datos = pd.DataFrame(
+            {
+                "Pregunta": ["Neutral", "Muy de acuerdo", None],
+                "Id": [10, 11, 12],
+            }
+        )
+        valores = detectar_columnas_likert(datos)["Pregunta"]
+        mapeo = {valor: obtener_valor_likert(valor) for valor in valores}
+
+        resultado = aplicar_mapeo_likert(datos, ["Pregunta"], mapeo)
+
+        self.assertEqual(resultado["Pregunta"].tolist(), [3, 5, pd.NA])
+        self.assertEqual(datos["Pregunta"].iloc[:2].tolist(), ["Neutral", "Muy de acuerdo"])
+        self.assertTrue(pd.isna(datos["Pregunta"].iloc[2]))
+        self.assertEqual(resultado["Id"].tolist(), [10, 11, 12])
+
+    def test_aplica_mapeo_manual_por_categoria(self):
+        datos = pd.DataFrame(
+            {"Pregunta": ["Neutral", "Totalmente de Acuerdo", "En desacuerdo"]}
+        )
+
+        resultado = aplicar_mapeo_likert(
+            datos,
+            ["Pregunta"],
+            {"Neutral": 1, "Totalmente de Acuerdo": 5, "En desacuerdo": 2},
+        )
+
+        self.assertEqual(resultado["Pregunta"].tolist(), [1, 5, 2])
+
+    def test_mapeo_manual_respeta_etiquetas_equivalentes_distintas(self):
+        datos = pd.DataFrame({"Pregunta": ["Neutral", "3 - Neutral"]})
+
+        resultado = aplicar_mapeo_likert(
+            datos,
+            ["Pregunta"],
+            {"Neutral": 1, "3 - Neutral": 3},
+        )
+
+        self.assertEqual(resultado["Pregunta"].tolist(), [1, 3])
+
+    def test_rechaza_mapeo_con_respuestas_sin_asignar(self):
+        datos = pd.DataFrame({"Pregunta": ["Neutral", "Respuesta libre"]})
+
+        with self.assertRaisesRegex(ErrorDatos, "sin asignar"):
+            aplicar_mapeo_likert(datos, ["Pregunta"], {"Neutral": 3})
 
     def test_rechaza_respuesta_invalida(self):
         datos = _crear_dataset()

@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 import unicodedata
 from dataclasses import dataclass
+from numbers import Real
 from typing import Final
 
 import pandas as pd
@@ -16,6 +17,64 @@ LIKERT_A_NUMERO: Final[dict[str, int]] = {
     "neutral": 3,
     "de acuerdo": 4,
     "totalmente de acuerdo": 5,
+}
+
+ETIQUETAS_LIKERT: Final[dict[int, str]] = {
+    1: "Totalmente en desacuerdo",
+    2: "En desacuerdo",
+    3: "Neutral",
+    4: "De acuerdo",
+    5: "Totalmente de acuerdo",
+}
+
+_VARIACIONES_LIKERT_A_NUMERO: Final[dict[int, tuple[str, ...]]] = {
+    1: (
+        "totalmente en desacuerdo",
+        "muy en desacuerdo",
+        "completamente en desacuerdo",
+        "fuertemente en desacuerdo",
+        "totalmente desacuerdo",
+        "muy desacuerdo",
+        "strongly disagree",
+        "totally disagree",
+        "td",
+        "ted",
+    ),
+    2: (
+        "en desacuerdo",
+        "algo en desacuerdo",
+        "parcialmente en desacuerdo",
+        "disagree",
+        "ed",
+    ),
+    3: (
+        "neutral",
+        "neutro",
+        "ni de acuerdo ni en desacuerdo",
+        "ni de acuerdo ni desacuerdo",
+        "indiferente",
+        "neither agree nor disagree",
+        "n",
+    ),
+    4: (
+        "de acuerdo",
+        "algo de acuerdo",
+        "parcialmente de acuerdo",
+        "agree",
+        "da",
+    ),
+    5: (
+        "totalmente de acuerdo",
+        "muy de acuerdo",
+        "completamente de acuerdo",
+        "fuertemente de acuerdo",
+        "totalmente acuerdo",
+        "muy acuerdo",
+        "strongly agree",
+        "totally agree",
+        "ta",
+        "tad",
+    ),
 }
 
 DIMENSIONES_BIG_FIVE: Final[dict[str, range]] = {
@@ -57,6 +116,116 @@ _LIKERT_NORMALIZADO: Final[dict[str, int]] = {
     _normalizar_texto(etiqueta): numero
     for etiqueta, numero in LIKERT_A_NUMERO.items()
 }
+for _numero, _variaciones in _VARIACIONES_LIKERT_A_NUMERO.items():
+    _LIKERT_NORMALIZADO.update(
+        {_normalizar_texto(variacion): _numero for variacion in _variaciones}
+    )
+
+
+def _normalizar_respuesta_likert(valor: object) -> str:
+    """Normaliza una respuesta y elimina numeración decorativa opcional."""
+    texto = _normalizar_texto(valor)
+    texto = re.sub(r"^[1-5]\s*(?:[-:.)]|–|—)\s*", "", texto)
+    texto = re.sub(r"\s*(?:\([- ]?[1-5]\)?|[-:]\s*[1-5])$", "", texto)
+    return texto.strip()
+
+
+def obtener_valor_likert(valor: object) -> int | None:
+    """Devuelve el valor 1--5 de una respuesta Likert reconocida.
+
+    Acepta tanto valores numéricos como etiquetas textuales en español e inglés,
+    incluyendo variaciones de mayúsculas, acentos, espacios y prefijos numéricos.
+    """
+    if pd.isna(valor) or isinstance(valor, bool):
+        return None
+
+    if isinstance(valor, Real):
+        numero = float(valor)
+        if numero.is_integer() and 1 <= numero <= 5:
+            return int(numero)
+
+    texto = _normalizar_respuesta_likert(valor)
+    if re.fullmatch(r"[1-5](?:\.0+)?", texto):
+        return int(float(texto))
+    return _LIKERT_NORMALIZADO.get(texto)
+
+
+def detectar_columnas_likert(datos: pd.DataFrame) -> dict[object, tuple[str, ...]]:
+    """Detecta columnas categóricas cuyos valores corresponden a una escala Likert.
+
+    Las columnas numéricas 1--5 ya están codificadas y no se devuelven, porque no
+    necesitan una asignación adicional. Los valores nulos se ignoran durante la
+    detección y se conservan al aplicar el mapeo.
+    """
+    detectadas: dict[object, tuple[str, ...]] = {}
+    for columna in datos.columns:
+        serie = datos[columna]
+        if pd.api.types.is_numeric_dtype(serie):
+            continue
+
+        valores = serie.dropna()
+        if valores.empty:
+            continue
+        if not valores.map(obtener_valor_likert).notna().all():
+            continue
+
+        unicos = tuple(dict.fromkeys(str(valor).strip() for valor in valores))
+        detectadas[columna] = unicos
+    return detectadas
+
+
+def aplicar_mapeo_likert(
+    datos: pd.DataFrame,
+    columnas: list[str] | tuple[str, ...],
+    mapeo: dict[str, int],
+) -> pd.DataFrame:
+    """Copia el dataset y convierte las columnas Likert según el mapeo indicado."""
+    if not mapeo:
+        raise ErrorDatos("Debes asignar al menos una categoría Likert.")
+
+    valores_mapeo = list(mapeo.values())
+    if any(not isinstance(valor, int) or isinstance(valor, bool) or not 1 <= valor <= 5
+           for valor in valores_mapeo):
+        raise ErrorDatos("Los valores de la escala Likert deben ser enteros del 1 al 5.")
+
+    mapeo_exacto = {
+        _normalizar_texto(etiqueta): valor
+        for etiqueta, valor in mapeo.items()
+    }
+    mapeo_normalizado = {
+        _normalizar_respuesta_likert(etiqueta): valor
+        for etiqueta, valor in mapeo.items()
+    }
+    resultado = datos.copy()
+
+    for columna in columnas:
+        if columna not in resultado.columns:
+            raise ErrorDatos(f"La columna Likert no existe: {columna}.")
+
+        serie = resultado[columna]
+        def convertir_valor(valor: object) -> object:
+            if pd.isna(valor):
+                return pd.NA
+            return mapeo_exacto.get(
+                _normalizar_texto(valor),
+                mapeo_normalizado.get(_normalizar_respuesta_likert(valor)),
+            )
+
+        convertida = serie.map(convertir_valor)
+        invalidos = serie[convertida.isna() & serie.notna()]
+        if not invalidos.empty:
+            encontrados = ", ".join(sorted({str(valor) for valor in invalidos}))
+            raise ErrorDatos(
+                f"La columna '{columna}' contiene respuestas sin asignar: {encontrados}."
+            )
+
+        resultado[columna] = (
+            convertida.astype("int8")
+            if not convertida.isna().any()
+            else convertida.astype("Int8")
+        )
+
+    return resultado
 
 
 class ServicioConjuntoDatos:
@@ -151,8 +320,8 @@ class ServicioConjuntoDatos:
         convertidas = pd.DataFrame(index=respuestas.index)
         invalidos: dict[int, list[str]] = {}
         for indice, columna in enumerate(columnas_preguntas, start=1):
-            normalizada = respuestas[columna].map(_normalizar_texto)
-            mascara_invalida = ~normalizada.isin(_LIKERT_NORMALIZADO)
+            normalizada = respuestas[columna].map(obtener_valor_likert)
+            mascara_invalida = normalizada.isna()
             if mascara_invalida.any():
                 invalidos[indice] = sorted(
                     respuestas.loc[mascara_invalida, columna]
@@ -161,7 +330,7 @@ class ServicioConjuntoDatos:
                     .unique()
                     .tolist()
                 )
-            convertidas[columna] = normalizada.map(_LIKERT_NORMALIZADO)
+            convertidas[columna] = normalizada
 
         if invalidos:
             detalle = "; ".join(
