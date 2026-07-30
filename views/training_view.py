@@ -54,6 +54,51 @@ def _tabla_evaluaciones(evaluaciones: tuple[EvaluacionK, ...]) -> pd.DataFrame:
     )
 
 
+def _interpretar_silhouette(valor: float) -> str:
+    """Traduce Silhouette a una orientación comprensible para el usuario."""
+    if valor < 0:
+        return "Asignación posiblemente incorrecta"
+    if valor < 0.25:
+        return "Separación débil"
+    if valor < 0.50:
+        return "Separación aceptable"
+    if valor < 0.70:
+        return "Buena separación"
+    return "Separación muy clara"
+
+
+def _tabla_comparacion_usuario(
+    evaluaciones: tuple[EvaluacionK, ...], k_recomendado: int
+) -> pd.DataFrame:
+    """Presenta las opciones de K con etiquetas y comparaciones amigables."""
+    filas = []
+    inercia_anterior = None
+    for evaluacion in evaluaciones:
+        if inercia_anterior is None:
+            mejora = "Punto de referencia"
+        else:
+            porcentaje = (
+                (inercia_anterior - evaluacion.inercia) / inercia_anterior
+            ) * 100
+            mejora = f"{porcentaje:.1f}%"
+
+        lectura = _interpretar_silhouette(evaluacion.silhouette)
+        if evaluacion.k == k_recomendado:
+            lectura = f"Recomendado · {lectura}"
+
+        filas.append(
+            {
+                "Número de grupos": evaluacion.k,
+                "Distancia dentro de los grupos": round(evaluacion.inercia, 3),
+                "Mejora frente a la opción anterior": mejora,
+                "Claridad de la separación": round(evaluacion.silhouette, 3),
+                "Lectura": lectura,
+            }
+        )
+        inercia_anterior = evaluacion.inercia
+    return pd.DataFrame(filas)
+
+
 def _grafica_codo(tabla: pd.DataFrame):
     """Construye la gráfica del método del codo a partir de la inercia."""
     return px.line(
@@ -61,24 +106,35 @@ def _grafica_codo(tabla: pd.DataFrame):
         x="K",
         y="Inercia",
         markers=True,
-        title="Método del codo",
-        labels={"K": "Número de clústeres", "Inercia": "Inercia"},
+        title="Compactación de los grupos (método del codo)",
+        labels={
+            "K": "Número de grupos",
+            "Inercia": "Distancia interna (menor es mejor)",
+        },
         color_discrete_sequence=["#2388ff"],
     ).update_layout(margin=dict(t=55, l=20, r=20, b=20))
 
 
 def _grafica_silhouette(tabla: pd.DataFrame):
     """Muestra la métrica usada por el sistema para recomendar K."""
+    minimo = float(tabla["Silhouette"].min())
+    maximo = float(tabla["Silhouette"].max())
+    limite_inferior = min(0.0, minimo - 0.05)
+    limite_superior = max(0.1, maximo + 0.05)
+
     return px.bar(
         tabla,
         x="K",
         y="Silhouette",
         text="Silhouette",
-        title="Separación de clústeres",
-        labels={"K": "Número de clústeres", "Silhouette": "Silhouette"},
+        title="Claridad de la separación entre grupos",
+        labels={
+            "K": "Número de grupos",
+            "Silhouette": "Calidad de separación (Silhouette)",
+        },
         color_discrete_sequence=["#43d78a"],
     ).update_traces(texttemplate="%{text:.3f}", textposition="outside").update_layout(
-        yaxis=dict(range=[-1, 1]),
+        yaxis=dict(range=[limite_inferior, limite_superior]),
         margin=dict(t=55, l=20, r=20, b=20),
     )
 
@@ -87,7 +143,8 @@ def _renderizar_modelo_kmeans() -> None:
     """Guía la selección de variables, recomendación de K y entrenamiento."""
     st.subheader("Configuración de K-Means")
     st.caption(
-        "Utiliza la copia numérica confirmada durante la preparación del dataset."
+        "K-Means reúne registros con características parecidas. Utiliza la copia "
+        "numérica confirmada durante la preparación del dataset."
     )
 
     datos_preparados = _obtener_datos_preparados()
@@ -106,7 +163,7 @@ def _renderizar_modelo_kmeans() -> None:
     ]
     if columnas_no_numericas:
         st.warning(
-            "Estas columnas no numéricas no pueden utilizarse en K-Means: "
+            "Estas columnas no numéricas no pueden utilizarse para formar grupos: "
             + ", ".join(columnas_no_numericas)
             + "."
         )
@@ -152,19 +209,76 @@ def _renderizar_modelo_kmeans() -> None:
 
     tabla = _tabla_evaluaciones(evaluaciones)
     k_recomendado = servicio.recomendar_k(evaluaciones)
-    st.success(
-        f"K recomendado: {k_recomendado}. Se eligió por obtener el mayor Silhouette."
+    mejor_silhouette = next(
+        evaluacion.silhouette
+        for evaluacion in evaluaciones
+        if evaluacion.k == k_recomendado
     )
+    candidatos = [evaluacion.k for evaluacion in evaluaciones]
+    st.success(
+        f"Se recomiendan {k_recomendado} grupos (K={k_recomendado}). Esta opción "
+        f"obtuvo la mejor separación entre las alternativas de "
+        f"{candidatos[0]} a {candidatos[-1]} grupos."
+    )
+    st.caption(
+        f"El límite de candidatos se ajustó automáticamente a "
+        f"{len(datos_modelo)} registros para evitar formar demasiados clústeres."
+    )
+    if mejor_silhouette < 0.25:
+        st.warning(
+            f"La separación encontrada es débil (Silhouette "
+            f"{mejor_silhouette:.3f}). El modelo puede entrenarse, pero los "
+            "grupos podrían no estar claramente diferenciados."
+        )
+
+    with st.container(border=True):
+        st.markdown("**¿Cómo leer este análisis?**")
+        st.markdown(
+            "- **Número de grupos (K):** cantidad de grupos que formaría el modelo.\n"
+            "- **Distancia interna o inercia:** indica qué tan parecidos quedan los "
+            "registros dentro de cada grupo; un valor menor es mejor.\n"
+            "- **Silhouette:** mide qué tan separados quedan los grupos. Se acerca a "
+            "1 cuando son claros, a 0 cuando se mezclan y puede ser negativo cuando "
+            "la asignación es deficiente.\n"
+            "- El sistema recomienda la opción con el **Silhouette más alto** dentro "
+            "del rango permitido."
+        )
 
     columna_codo, columna_silhouette = st.columns(2)
     with columna_codo:
         st.plotly_chart(_grafica_codo(tabla), width="stretch")
     with columna_silhouette:
         st.plotly_chart(_grafica_silhouette(tabla), width="stretch")
-    st.dataframe(tabla, hide_index=True, width="stretch")
+    st.subheader("Comparación de las opciones")
+    st.caption(
+        "La interpretación es orientativa: ayuda a comparar alternativas, pero no "
+        "garantiza que existan grupos claramente separados."
+    )
+    st.dataframe(
+        _tabla_comparacion_usuario(evaluaciones, k_recomendado),
+        hide_index=True,
+        width="stretch",
+        column_config={
+            "Número de grupos": st.column_config.NumberColumn(
+                help="Cantidad de grupos que formaría K-Means.",
+                format="%d",
+            ),
+            "Distancia dentro de los grupos": st.column_config.NumberColumn(
+                help="También se llama inercia. Un valor menor indica grupos más compactos.",
+                format="%.3f",
+            ),
+            "Mejora frente a la opción anterior": st.column_config.TextColumn(
+                help="Reducción de la distancia interna al agregar un grupo."
+            ),
+            "Claridad de la separación": st.column_config.NumberColumn(
+                help="Métrica Silhouette. Un valor mayor indica grupos mejor separados.",
+                format="%.3f",
+            ),
+        },
+    )
 
     if st.button(
-        f"Entrenar K-Means con K = {k_recomendado}",
+        f"Entrenar K-Means con {k_recomendado} grupos",
         type="primary",
         width="content",
     ):
@@ -194,12 +308,12 @@ def _renderizar_modelo_kmeans() -> None:
             st.session_state["resultado_entrenamiento"] = resultado
             st.session_state["modelo_entrenado"] = True
             st.success(
-                f"Modelo entrenado con {resultado.k_usado} clústeres y "
-                f"Silhouette de {resultado.silhouette:.3f}."
+                f"Modelo entrenado con {resultado.k_usado} grupos y una calidad "
+                f"de separación de {resultado.silhouette:.3f}."
             )
             tamanos = resultado.tamanos_clusters.rename("Registros").to_frame()
-            tamanos.index.name = "Clúster"
-            st.subheader("Registros por clúster")
+            tamanos.index.name = "Grupo"
+            st.subheader("Cantidad de registros en cada grupo")
             st.dataframe(tamanos, width="stretch")
         except ErrorEntrenamiento as error:
             progreso.empty()

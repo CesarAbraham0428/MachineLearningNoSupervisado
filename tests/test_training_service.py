@@ -41,6 +41,16 @@ class PruebasServicioEntrenamiento(unittest.TestCase):
             max(evaluacion.silhouette for evaluacion in evaluaciones), -1.0
         )
 
+    def test_limita_candidatos_k_segun_tamano_de_muestra(self):
+        self.assertEqual(
+            list(self.servicio._candidatos_k(cantidad_registros=10, maximo_k=8)),
+            [2, 3],
+        )
+        self.assertEqual(
+            list(self.servicio._candidatos_k(cantidad_registros=51, maximo_k=8)),
+            [2, 3, 4, 5, 6, 7],
+        )
+
     def test_entrena_y_devuelve_centroides_en_escala_original(self):
         resultado = self.servicio.entrenar_modelo(_datos_de_prueba(), maximo_k=3)
 

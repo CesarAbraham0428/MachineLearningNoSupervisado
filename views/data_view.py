@@ -1,7 +1,7 @@
 """Vista para cargar, filtrar y consultar conjuntos de datos."""
 
 import io
-from datetime import datetime
+from datetime import date, datetime
 from html import escape
 
 import pandas as pd
@@ -10,6 +10,84 @@ import streamlit as st
 
 _SIN_FILTRO = "Sin filtro"
 _TODOS = "Todos"
+
+
+def _etiqueta_columna(columna: object) -> str:
+    """Devuelve un nombre visible sin modificar el encabezado original."""
+    nombre = str(columna).strip()
+    if nombre.casefold() in {"marca temporal", "timestamp"}:
+        return "Fecha y hora de respuesta"
+    return nombre
+
+
+def _convertir_fechas(serie: pd.Series) -> pd.Series:
+    """Convierte fechas comunes, incluidas marcas de Google Forms en español."""
+    if pd.api.types.is_datetime64_any_dtype(serie):
+        return pd.to_datetime(serie, errors="coerce")
+
+    texto = serie.astype("string").str.strip()
+    texto = texto.str.replace(r"(?i)a\s*\.\s*m\s*\.", "AM", regex=True)
+    texto = texto.str.replace(r"(?i)p\s*\.\s*m\s*\.", "PM", regex=True)
+    texto = texto.str.replace(
+        r"(?i)\s+GMT\s*[+-]\s*\d{1,2}(?::?\d{2})?\s*$",
+        "",
+        regex=True,
+    )
+    return pd.to_datetime(texto, errors="coerce", format="mixed")
+
+
+def _detectar_columnas_temporales(df: pd.DataFrame) -> list[str]:
+    """Detecta columnas cuyos valores representan fechas y horas."""
+    temporales = []
+    for columna in df.columns:
+        serie = df[columna]
+        if pd.api.types.is_numeric_dtype(serie):
+            continue
+        valores_presentes = int(serie.notna().sum())
+        if valores_presentes == 0:
+            continue
+        fechas_validas = int(_convertir_fechas(serie).notna().sum())
+        if fechas_validas / valores_presentes >= 0.8:
+            temporales.append(columna)
+    return temporales
+
+
+def _limites_rango_fechas(
+    valor: object,
+    fecha_minima: date,
+    fecha_maxima: date,
+) -> tuple[date, date]:
+    """Normaliza selecciones completas o parciales del selector de fechas."""
+    if isinstance(valor, (tuple, list)) and valor:
+        fechas = [pd.Timestamp(item).date() for item in valor[:2]]
+        if len(fechas) == 1:
+            fechas.append(fechas[0])
+        inicio, fin = sorted(fechas)
+        return inicio, fin
+    return fecha_minima, fecha_maxima
+
+
+def _asegurar_rango_fechas(serie: pd.Series) -> tuple[date, date]:
+    """Inicializa o corrige el rango persistido para el dataset actual."""
+    fechas = _convertir_fechas(serie).dropna()
+    fecha_minima = fechas.min().date()
+    fecha_maxima = fechas.max().date()
+    rango_guardado = st.session_state.get("rango_fechas_filtro")
+
+    try:
+        inicio, fin = _limites_rango_fechas(
+            rango_guardado,
+            fecha_minima,
+            fecha_maxima,
+        )
+    except (TypeError, ValueError):
+        inicio, fin = fecha_minima, fecha_maxima
+
+    if inicio < fecha_minima or fin > fecha_maxima:
+        st.session_state["rango_fechas_filtro"] = (fecha_minima, fecha_maxima)
+    elif rango_guardado is None:
+        st.session_state["rango_fechas_filtro"] = (fecha_minima, fecha_maxima)
+    return fecha_minima, fecha_maxima
 
 
 
@@ -36,6 +114,7 @@ def _inicializar_estado() -> None:
         "mapeo_likert": {},
         "firma_likert": None,
         "columnas_likert": [],
+        "rango_fechas_filtro": None,
     }
     for clave, valor in valores_iniciales.items():
         if clave not in st.session_state:
@@ -61,6 +140,7 @@ def _limpiar_estado_dataset() -> None:
     st.session_state.mapeo_likert = {}
     st.session_state.firma_likert = None
     st.session_state.columnas_likert = []
+    st.session_state.rango_fechas_filtro = None
 
 
 def _detectar_columnas_categoricas(df: pd.DataFrame) -> list[str]:
@@ -95,9 +175,21 @@ def _obtener_subconjunto(
         and columna_filtro != _SIN_FILTRO
         and valor_filtro != _TODOS
     ):
-        resultado = datos.loc[
-            datos[columna_filtro].astype(str).eq(str(valor_filtro))
-        ]
+        if isinstance(valor_filtro, (tuple, list)) and valor_filtro:
+            fechas = _convertir_fechas(datos[columna_filtro])
+            fechas_validas = fechas.dropna()
+            if not fechas_validas.empty:
+                inicio, fin = _limites_rango_fechas(
+                    valor_filtro,
+                    fechas_validas.min().date(),
+                    fechas_validas.max().date(),
+                )
+                dias = fechas.dt.date
+                resultado = datos.loc[dias.between(inicio, fin)]
+        else:
+            resultado = datos.loc[
+                datos[columna_filtro].astype(str).eq(str(valor_filtro))
+            ]
     return resultado.loc[:, columnas_validas].copy()
 
 
@@ -269,6 +361,7 @@ def _renderizar_carga() -> None:
         st.session_state.columnas_likert = []
         st.session_state.resultado_limpieza = None
         st.session_state.dataset_limpio = None
+        st.session_state.rango_fechas_filtro = None
         st.session_state["sel_columna_filtro"] = _SIN_FILTRO
         st.session_state["sel_valor_filtro"] = _TODOS
         st.toast("Dataset cargado correctamente")
@@ -300,10 +393,16 @@ def _renderizar_tabla_paginada(df: pd.DataFrame) -> None:
     with col_info:
         st.caption(f"Mostrando {inicio + 1} a {fin} de {total_registros:,} registros")
 
+    configuracion_columnas = {
+        columna: st.column_config.TextColumn(_etiqueta_columna(columna))
+        for columna in df_pagina.columns
+        if _etiqueta_columna(columna) != str(columna)
+    }
     st.dataframe(
         df_pagina,
         width="stretch",
         height=min(430, (len(df_pagina) + 1) * 38 + 4),
+        column_config=configuracion_columnas,
     )
     _renderizar_paginacion(pagina_actual, total_paginas)
 
@@ -390,6 +489,10 @@ def renderizar_vista_datos() -> None:
 
     todas_columnas = list(df_cargado.columns)
     columnas_categoricas = _detectar_columnas_categoricas(df_cargado)
+    columnas_temporales = _detectar_columnas_temporales(df_cargado)
+    columnas_filtrables = list(
+        dict.fromkeys(columnas_temporales + columnas_categoricas)
+    )
 
     # Sincronizar selección con el estado de sesión; descartar columnas que ya no existen
     seleccion_previa = [
@@ -415,7 +518,15 @@ def renderizar_vista_datos() -> None:
     columna_filtro_exportacion = st.session_state.get(
         "sel_columna_filtro", _SIN_FILTRO
     )
-    valor_filtro_exportacion = st.session_state.get("sel_valor_filtro", _TODOS)
+    if columna_filtro_exportacion in columnas_temporales:
+        _asegurar_rango_fechas(df_cargado[columna_filtro_exportacion])
+        valor_filtro_exportacion = st.session_state.get(
+            "rango_fechas_filtro", _TODOS
+        )
+    else:
+        valor_filtro_exportacion = st.session_state.get(
+            "sel_valor_filtro", _TODOS
+        )
     df_para_exportar = _obtener_subconjunto(
         df_cargado,
         columnas_para_exportar,
@@ -468,6 +579,7 @@ def renderizar_vista_datos() -> None:
             "Filtrar columnas a mostrar",
             options=todas_columnas,
             default=seleccion_previa,
+            format_func=_etiqueta_columna,
             placeholder="Selecciona al menos 2 columnas…",
             key="ms_columnas_filtro",
             help="Elige las columnas que deseas visualizar. Se requieren mínimo 2 columnas para realizar clustering.",
@@ -475,12 +587,14 @@ def renderizar_vista_datos() -> None:
 
         col_filtro, col_valor = st.columns(2)
         with col_filtro:
-            if columnas_categoricas:
+            if columnas_filtrables:
                 columna_filtro = st.selectbox(
                     "Filtrar filas por columna",
-                    options=[_SIN_FILTRO] + columnas_categoricas,
+                    options=[_SIN_FILTRO] + columnas_filtrables,
+                    format_func=_etiqueta_columna,
                     key="sel_columna_filtro",
-                    help="Selecciona una columna categórica, por ejemplo Comuna, para revisar solo sus registros.",
+                    persist_state="session",
+                    help="Selecciona una columna para revisar solo los registros que coincidan.",
                 )
             else:
                 columna_filtro = _SIN_FILTRO
@@ -490,6 +604,19 @@ def renderizar_vista_datos() -> None:
             if columna_filtro == _SIN_FILTRO:
                 valor_filtro = _TODOS
                 st.caption("Selecciona una columna para filtrar filas")
+            elif columna_filtro in columnas_temporales:
+                fecha_minima, fecha_maxima = _asegurar_rango_fechas(
+                    df_cargado[columna_filtro]
+                )
+                valor_filtro = st.date_input(
+                    "Rango de fechas",
+                    min_value=fecha_minima,
+                    max_value=fecha_maxima,
+                    key="rango_fechas_filtro",
+                    format="DD/MM/YYYY",
+                    persist_state="session",
+                    help="Selecciona la fecha inicial y final. Se incluyen ambos días.",
+                )
             else:
                 valores_unicos = [_TODOS] + sorted(
                     {
@@ -504,6 +631,7 @@ def renderizar_vista_datos() -> None:
                     "Valor",
                     options=valores_unicos,
                     key="sel_valor_filtro",
+                    persist_state="session",
                 )
 
         # Validar mínimo 2 columnas para clustering
@@ -579,11 +707,28 @@ def renderizar_vista_datos() -> None:
                 f"{excluidas} columna(s) ocultada(s)"
             )
         if columna_filtro != _SIN_FILTRO and valor_filtro != _TODOS:
+            etiqueta_filtro = _etiqueta_columna(columna_filtro)
+            if columna_filtro in columnas_temporales:
+                fechas_validas = _convertir_fechas(
+                    df_cargado[columna_filtro]
+                ).dropna()
+                inicio, fin = _limites_rango_fechas(
+                    valor_filtro,
+                    fechas_validas.min().date(),
+                    fechas_validas.max().date(),
+                )
+                valor_visible = (
+                    inicio.strftime("%d/%m/%Y")
+                    if inicio == fin
+                    else f"{inicio:%d/%m/%Y} al {fin:%d/%m/%Y}"
+                )
+            else:
+                valor_visible = str(valor_filtro)
             notas_filtro.append(
                 f"Filas: <strong>{len(df_filtrado):,}</strong> de "
                 f"<strong>{len(df_cargado):,}</strong> · "
-                f"<strong>{escape(str(columna_filtro))}</strong> = "
-                f"<strong>{escape(str(valor_filtro))}</strong>"
+                f"<strong>{escape(etiqueta_filtro)}</strong>: "
+                f"<strong>{escape(valor_visible)}</strong>"
             )
         if notas_filtro:
             st.html(

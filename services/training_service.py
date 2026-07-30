@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from math import sqrt
 from typing import Iterable
 
 import numpy as np
@@ -106,7 +107,14 @@ class ServicioEntrenamiento:
 
     @staticmethod
     def _candidatos_k(cantidad_registros: int, maximo_k: int) -> range:
-        limite = min(maximo_k, cantidad_registros - 1)
+        """Limita K para evitar demasiados clústeres en muestras pequeñas.
+
+        La raíz cuadrada del número de registros funciona como un límite
+        conservador de candidatos. La elección final dentro de ese rango sigue
+        realizándose con Silhouette.
+        """
+        limite_muestra = max(2, round(sqrt(cantidad_registros)))
+        limite = min(maximo_k, cantidad_registros - 1, limite_muestra)
         if limite < 2:
             raise ErrorEntrenamiento(
                 "No hay suficientes registros para comparar valores de K."
