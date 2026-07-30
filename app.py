@@ -11,6 +11,7 @@ from views.data_view import (
 )
 from views.statistics_view import renderizar_vista_estadisticas
 from views.training_view import renderizar_vista_entrenamiento
+from views.results_view import renderizar_vista_resultados
 
 
 _SECCIONES = (
@@ -110,11 +111,7 @@ def main() -> None:
     elif tab_activa == 2:
         renderizar_vista_entrenamiento()
     elif tab_activa == 3:
-        _renderizar_estado_vacio(
-            "Resultados del entrenamiento",
-            "Cuando exista un modelo entrenado, aquí aparecerán sus métricas y visualizaciones.",
-            "query_stats",
-        )
+        renderizar_vista_resultados()
     else:
         _renderizar_estado_vacio(
             "Modelos guardados",

@@ -305,6 +305,7 @@ def _renderizar_modelo_kmeans() -> None:
                 progreso.progress(100, text="Modelo listo")
                 estado.update(label="Modelo listo", state="complete", expanded=False)
 
+            st.session_state.pop("variable_perfil_resultados", None)
             st.session_state["resultado_entrenamiento"] = resultado
             st.session_state["modelo_entrenado"] = True
             st.success(
@@ -479,6 +480,9 @@ def _limpiar_estado_preparacion_entrenamiento() -> None:
     st.session_state.columnas_likert = []
     st.session_state.dataframe_entrenamiento = None
     st.session_state.firma_entrenamiento = None
+    st.session_state.modelo_entrenado = False
+    st.session_state.resultado_entrenamiento = None
+    st.session_state.pop("variable_perfil_resultados", None)
 
 
 def _guardar_dataframe_entrenamiento(
@@ -486,6 +490,16 @@ def _guardar_dataframe_entrenamiento(
     firma_datos: tuple[object, tuple[str, ...], int, int],
 ) -> None:
     """Guarda una copia del dataset final que consumirá el entrenamiento."""
+    datos_anteriores = st.session_state.get("dataframe_entrenamiento")
+    cambio_datos = (
+        st.session_state.get("firma_entrenamiento") != firma_datos
+        or not isinstance(datos_anteriores, pd.DataFrame)
+        or not datos_anteriores.equals(df)
+    )
+    if cambio_datos:
+        st.session_state.modelo_entrenado = False
+        st.session_state.resultado_entrenamiento = None
+        st.session_state.pop("variable_perfil_resultados", None)
     st.session_state.dataframe_entrenamiento = df.copy()
     st.session_state.firma_entrenamiento = firma_datos
 
@@ -673,6 +687,8 @@ def renderizar_vista_entrenamiento() -> None:
         "columnas_likert": [],
         "dataframe_entrenamiento": None,
         "firma_entrenamiento": None,
+        "modelo_entrenado": False,
+        "resultado_entrenamiento": None,
     }
     for clave, valor_defecto in claves_requeridas.items():
         if clave not in st.session_state:

@@ -104,6 +104,7 @@ def _inicializar_estado() -> None:
         "pagina_actual": 1,
         "mostrar_carga": False,
         "modelo_entrenado": False,
+        "resultado_entrenamiento": None,
         "modelos_guardados": [],
         "columnas_seleccionadas": [],
         "dataframe_filtrado": None,
@@ -131,6 +132,9 @@ def _limpiar_estado_dataset() -> None:
     st.session_state.fecha_carga = None
     st.session_state.pagina_actual = 1
     st.session_state.mostrar_carga = True
+    st.session_state.modelo_entrenado = False
+    st.session_state.resultado_entrenamiento = None
+    st.session_state.pop("variable_perfil_resultados", None)
     st.session_state.columnas_seleccionadas = []
     st.session_state.dataframe_filtrado = None
     st.session_state.filtro_calidad = None
@@ -350,6 +354,9 @@ def _renderizar_carga() -> None:
         st.session_state.fecha_carga = datetime.now().strftime("%d/%m/%Y %H:%M")
         st.session_state.pagina_actual = 1
         st.session_state.mostrar_carga = False
+        st.session_state.modelo_entrenado = False
+        st.session_state.resultado_entrenamiento = None
+        st.session_state.pop("variable_perfil_resultados", None)
         st.session_state.columnas_seleccionadas = []
         st.session_state.dataframe_filtrado = None
         st.session_state.filtro_calidad = None
@@ -680,6 +687,9 @@ def renderizar_vista_datos() -> None:
             st.session_state.mapeo_likert = {}
             st.session_state.firma_likert = None
             st.session_state.columnas_likert = []
+            st.session_state.modelo_entrenado = False
+            st.session_state.resultado_entrenamiento = None
+            st.session_state.pop("variable_perfil_resultados", None)
         if (
             st.session_state.get("filtro_calidad") == firma_filtro
             and st.session_state.get("resultado_limpieza") is not None
