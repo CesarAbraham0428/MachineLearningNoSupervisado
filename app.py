@@ -12,6 +12,7 @@ from views.data_view import (
 from views.statistics_view import renderizar_vista_estadisticas
 from views.training_view import renderizar_vista_entrenamiento
 from views.results_view import renderizar_vista_resultados
+from views.models_view import renderizar_vista_modelos
 
 
 _SECCIONES = (
@@ -113,11 +114,7 @@ def main() -> None:
     elif tab_activa == 3:
         renderizar_vista_resultados()
     else:
-        _renderizar_estado_vacio(
-            "Modelos guardados",
-            "Consulta y reutiliza modelos entrenados desde un único lugar.",
-            "inventory_2",
-        )
+        renderizar_vista_modelos()
 
 
 if __name__ == "__main__":

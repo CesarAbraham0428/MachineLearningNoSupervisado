@@ -7,6 +7,8 @@ from html import escape
 import pandas as pd
 import streamlit as st
 
+from services.model_service import ErrorModelo, ServicioModelo
+
 
 _SIN_FILTRO = "Sin filtro"
 _TODOS = "Todos"
@@ -275,7 +277,10 @@ def renderizar_metricas() -> None:
     num_registros = len(df) if df is not None else 0
     num_variables = len(df.columns) if df is not None else 0
     modelo_entrenado = bool(st.session_state.modelo_entrenado)
-    modelos_guardados = len(st.session_state.modelos_guardados)
+    try:
+        modelos_guardados = ServicioModelo().contar_modelos()
+    except ErrorModelo:
+        modelos_guardados = len(st.session_state.modelos_guardados)
 
     estado_modelo = "Entrenado" if modelo_entrenado else "No entrenado"
     estado_badge = "Listo" if modelo_entrenado else "Pendiente"

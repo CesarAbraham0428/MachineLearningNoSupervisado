@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
+from services.model_service import ErrorModelo, ServicioModelo
 from services.results_service import ErrorResultados, ServicioResultados
 from services.training_service import ResultadoEntrenamiento
 
@@ -21,6 +24,82 @@ _COLORES_GRUPOS = [
     "#f4c95d",
     "#8b9a77",
 ]
+
+
+def _nombre_base_dataset(nombre_archivo: object) -> str:
+    """Convierte el archivo de origen en una etiqueta amigable."""
+    nombre = Path(str(nombre_archivo or "Dataset")).stem.strip()
+    nombre = nombre.replace("_", " ").replace("-", " ")
+    return " ".join(nombre.split()) or "Dataset"
+
+
+@st.dialog(
+    "Guardar modelo",
+    width="small",
+    icon=":material/save:",
+    on_dismiss="rerun",
+)
+def _dialogo_guardar_modelo(resultado: ResultadoEntrenamiento) -> None:
+    """Solicita solo los datos comprensibles que identifican al modelo."""
+    nombre_archivo = str(
+        st.session_state.get("nombre_archivo") or "Dataset sin nombre"
+    )
+    nombre_base = _nombre_base_dataset(nombre_archivo)
+
+    st.caption(
+        "Asigna un nombre para encontrar este entrenamiento fácilmente después."
+    )
+    with st.container(border=True):
+        st.markdown(
+            f"**Resumen:** {len(resultado.asignaciones)} registros · "
+            f"{len(resultado.columnas)} variables · "
+            f"{resultado.k_usado} grupos · K-Means"
+        )
+        st.caption("La fecha de creación se registrará automáticamente.")
+
+    with st.form("form_guardar_modelo"):
+        nombre = st.text_input(
+            "Nombre del modelo",
+            value=f"{nombre_base} - {resultado.k_usado} grupos",
+            max_chars=100,
+            help="Este nombre aparecerá en la pestaña Modelos guardados.",
+        )
+        categoria = st.text_input(
+            "Categoría o propósito",
+            value=nombre_base,
+            max_chars=100,
+            help=(
+                "Describe para qué se utilizará, por ejemplo: Personalidad, "
+                "Clientes o Encuesta académica."
+            ),
+        )
+        guardar = st.form_submit_button(
+            "Guardar modelo",
+            type="primary",
+            icon=":material/save:",
+            width="stretch",
+        )
+
+    if not guardar:
+        return
+
+    try:
+        modelo_guardado = ServicioModelo().guardar_modelo(
+            resultado,
+            nombre=nombre,
+            categoria=categoria,
+            dataset_origen=nombre_archivo,
+            mapeo_likert=st.session_state.get("mapeo_likert", {}),
+            columnas_likert=st.session_state.get("columnas_likert", []),
+        )
+    except ErrorModelo as error:
+        st.error(str(error), icon=":material/error:")
+        return
+
+    st.session_state["confirmacion_modelo_guardado"] = (
+        f'El modelo "{modelo_guardado.nombre}" se guardó correctamente.'
+    )
+    st.rerun()
 
 
 def _grafica_distribucion(resumen: pd.DataFrame):
@@ -166,6 +245,19 @@ def renderizar_vista_resultados() -> None:
                 "**Entrenamiento**. Al finalizar, los resultados aparecerán aquí."
             )
         return
+
+    with st.container(horizontal=True, horizontal_alignment="right"):
+        if st.button(
+            "Guardar modelo",
+            type="primary",
+            icon=":material/save:",
+            key="btn_abrir_guardar_modelo",
+        ):
+            _dialogo_guardar_modelo(resultado)
+
+    confirmacion = st.session_state.pop("confirmacion_modelo_guardado", None)
+    if confirmacion:
+        st.success(confirmacion, icon=":material/check_circle:")
 
     servicio = ServicioResultados()
     try:
