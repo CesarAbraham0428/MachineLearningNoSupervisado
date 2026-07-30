@@ -91,9 +91,9 @@ class PruebasServicioConjuntoDatos(unittest.TestCase):
         diagnostico = diagnosticar_calidad(datos)
         resultado = limpiar_dataset(datos)
 
-        self.assertNotIn("Likert", diagnostico.outliers_por_columna)
+        self.assertEqual(len(diagnostico.outliers_por_columna), 0)
         self.assertTrue(resultado.dataset_limpio["Likert"].equals(datos["Likert"]))
-        self.assertEqual(resultado.outliers_tratados, 1)
+        self.assertEqual(resultado.outliers_tratados, 0)
 
 
 if __name__ == "__main__":

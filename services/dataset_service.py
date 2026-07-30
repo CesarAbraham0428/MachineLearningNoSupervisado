@@ -307,12 +307,6 @@ def diagnosticar_calidad(df: pd.DataFrame) -> DiagnosticoCalidad:
     nulos_con_problemas = nulos[nulos > 0]
 
     outliers: dict = {}
-    for col in columnas_numericas:
-        if _es_escala_likert(df[col]):
-            continue
-        cantidad = _detectar_outliers_iqr(df[col])
-        if cantidad > 0:
-            outliers[col] = cantidad
 
     return DiagnosticoCalidad(
         num_filas=len(df),
@@ -347,14 +341,12 @@ class ResultadoLimpieza:
 
 
 def limpiar_dataset(df: pd.DataFrame) -> ResultadoLimpieza:
-    """Limpia automáticamente un DataFrame aplicando cuatro pasos secuenciales.
+    """Limpia automáticamente un DataFrame aplicando tres pasos secuenciales.
 
     Pasos en orden:
     1. Eliminar filas completamente duplicadas.
     2. Imputar nulos en columnas numéricas con la **mediana** de cada columna.
     3. Imputar nulos en columnas categóricas con la **moda** de cada columna.
-    4. Aplicar **winsorización** (clamping por IQR) en columnas numéricas para
-       tratar outliers sin eliminar filas.
 
     IMPORTANTE: el DataFrame original `df` nunca se modifica.
 
@@ -391,23 +383,8 @@ def limpiar_dataset(df: pd.DataFrame) -> ResultadoLimpieza:
                 df_trabajo[col] = df_trabajo[col].fillna(modas.iloc[0])
                 nulos_corregidos += faltantes
 
-    # 4. Winsorización por IQR en columnas numéricas
+    # 4. Outliers tratados se establece en 0 (funcionalidad removida)
     outliers_tratados = 0
-    for col in columnas_numericas:
-        serie = df_trabajo[col]
-        if _es_escala_likert(serie):
-            continue
-        q1 = serie.quantile(0.25)
-        q3 = serie.quantile(0.75)
-        riq = q3 - q1
-        if riq == 0:
-            continue
-        limite_inf = q1 - 1.5 * riq
-        limite_sup = q3 + 1.5 * riq
-        fuera_de_rango = ((serie < limite_inf) | (serie > limite_sup)).sum()
-        if fuera_de_rango > 0:
-            df_trabajo[col] = serie.clip(lower=limite_inf, upper=limite_sup)
-            outliers_tratados += int(fuera_de_rango)
 
     return ResultadoLimpieza(
         duplicados_eliminados=duplicados_eliminados,
