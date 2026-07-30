@@ -10,6 +10,7 @@ from views.data_view import (
     renderizar_vista_datos,
 )
 from views.statistics_view import renderizar_vista_estadisticas
+from views.training_view import renderizar_vista_entrenamiento
 
 
 _SECCIONES = (
@@ -107,11 +108,7 @@ def main() -> None:
     elif tab_activa == 1:
         renderizar_vista_estadisticas()
     elif tab_activa == 2:
-        _renderizar_estado_vacio(
-            "Entrenamiento K-Means",
-            "Selecciona variables, configura el número de clústeres y prepara el modelo.",
-            "model_training",
-        )
+        renderizar_vista_entrenamiento()
     elif tab_activa == 3:
         _renderizar_estado_vacio(
             "Resultados del entrenamiento",
