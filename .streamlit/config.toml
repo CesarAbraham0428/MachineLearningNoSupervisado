@@ -1,11 +1,11 @@
 [theme]
 base = "dark"
-primaryColor = "#2388FF"
+primaryColor = "#D88967"
 backgroundColor = "#061326"
-secondaryBackgroundColor = "#0B1A2C"
-textColor = "#E8F0FA"
-linkColor = "#68ABFF"
-borderColor = "#1D304A"
+secondaryBackgroundColor = "#211D29"
+textColor = "#F5F0F7"
+linkColor = "#B99AEF"
+borderColor = "#40364D"
 font = "'IBM Plex Sans':https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
 headingFont = "'IBM Plex Sans':https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@500;600;700&display=swap"
 baseFontSize = 14
@@ -17,21 +17,21 @@ buttonRadius = "small"
 showWidgetBorder = true
 showSidebarBorder = true
 linkUnderline = false
-redColor = "#F05D7A"
-orangeColor = "#F39A32"
-yellowColor = "#FFB81C"
-greenColor = "#43D78A"
-blueColor = "#2388FF"
-violetColor = "#B876FF"
-grayColor = "#8FA2BC"
-dataframeBorderColor = "#1D304A"
-dataframeHeaderBackgroundColor = "#10243A"
-chartCategoricalColors = ["#2388FF", "#B876FF", "#43D78A", "#F39A32", "#F05D7A", "#68ABFF"]
-chartSequentialColors = ["#E8F0FA", "#B9D7FF", "#7DB8FF", "#4C9BFF", "#2388FF", "#1971D3", "#1559A5", "#103F76", "#0B2B50", "#061326"]
+redColor = "#E57D92"
+orangeColor = "#D88967"
+yellowColor = "#F1B35B"
+greenColor = "#57D29B"
+blueColor = "#5EA7D9"
+violetColor = "#AC91F2"
+grayColor = "#A79AAD"
+dataframeBorderColor = "#40364D"
+dataframeHeaderBackgroundColor = "#2C2537"
+chartCategoricalColors = ["#D88967", "#5FBDB5", "#AC91F2", "#F1B35B", "#E57D92", "#5EA7D9"]
+chartSequentialColors = ["#F5F0F7", "#E7D7D0", "#D9B4A5", "#CB9480", "#D88967", "#B66F58", "#8F5948", "#6E4439", "#4B3030", "#2B2024"]
 
 [theme.sidebar]
-backgroundColor = "#07172A"
-secondaryBackgroundColor = "#0B1A2C"
-textColor = "#E8F0FA"
-borderColor = "#1D304A"
-primaryColor = "#2388FF"
+backgroundColor = "#191620"
+secondaryBackgroundColor = "#241F2C"
+textColor = "#F5F0F7"
+borderColor = "#40364D"
+primaryColor = "#AC91F2"

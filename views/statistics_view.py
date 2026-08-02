@@ -111,13 +111,14 @@ def renderizar_vista_estadisticas() -> None:
             fecha_generacion=datetime.now(),
         )
         st.download_button(
-            "📄 Descargar PDF",
+            "Descargar PDF",
             data=reporte_pdf,
             file_name="reporte_estadistico_inicial.pdf",
             mime="application/pdf",
             type="primary",
             key="descargar_reporte_estadistico",
             width="stretch",
+            icon=":material/picture_as_pdf:",
         )
 
     faltantes = int(resumen.faltantes_por_pregunta.sum())

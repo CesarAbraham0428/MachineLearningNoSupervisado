@@ -6,19 +6,26 @@
 
 :root {
     --cl-bg: #061326;
-    --cl-surface: #07172a;
-    --cl-surface-raised: #0b1a2c;
-    --cl-surface-soft: #0d2036;
-    --cl-border: #1d304a;
-    --cl-border-strong: #2b476a;
-    --cl-text: #e8f0fa;
-    --cl-muted: #9aacc2;
-    --cl-subtle: #7187a1;
-    --cl-blue: #2388ff;
-    --cl-violet: #b876ff;
-    --cl-green: #43d78a;
-    --cl-amber: #f39a32;
-    --cl-red: #f05d7a;
+    --cl-surface: #1d1a24;
+    --cl-surface-raised: #262230;
+    --cl-surface-soft: #30283d;
+    --cl-border: #40364d;
+    --cl-border-strong: #594d6b;
+    --cl-text: #f5f0f7;
+    --cl-muted: #c3b6ca;
+    --cl-subtle: #a79aad;
+    --cl-primary: #d88967;
+    --cl-primary-hover: #e9a078;
+    --cl-nav: #8e75c8;
+    --cl-nav-hover: #b9a3ed;
+    --cl-blue: #5ea7d9;
+    --cl-violet: #ac91f2;
+    --cl-teal: #5fbdb5;
+    --cl-teal-hover: #7bd2ca;
+    --cl-green: #57d29b;
+    --cl-amber: #f1b35b;
+    --cl-red: #e57d92;
+    --cl-red-hover: #f09aae;
 }
 
 /* ── Streamlit chrome ───────────────────────────────────────────────────────── */
@@ -56,7 +63,7 @@ body,
 
 ::selection {
     color: #ffffff;
-    background: rgba(35, 136, 255, 0.35);
+    background: rgba(216, 137, 103, 0.35);
 }
 
 /* ── Navegación segmentada ──────────────────────────────────────────────────── */
@@ -65,8 +72,8 @@ body,
     max-width: 980px;
     margin: 6px 0 22px;
     padding: 5px;
-    background: var(--cl-surface);
-    border: 1px solid var(--cl-border);
+    background: var(--cl-surface-raised);
+    border: 1px solid var(--cl-border-strong);
     border-radius: 10px;
 }
 
@@ -88,20 +95,20 @@ body,
 
 [data-testid="stSegmentedControl"] button:hover {
     color: var(--cl-text) !important;
-    background: rgba(35, 136, 255, 0.08) !important;
+    background: rgba(142, 117, 200, 0.14) !important;
 }
 
 [data-testid="stSegmentedControl"] button[aria-checked="true"] {
-    color: #72b8ff !important;
-    background: #0b2139 !important;
-    box-shadow: inset 0 -2px 0 var(--cl-blue) !important;
+    color: #eadfff !important;
+    background: #382f4b !important;
+    box-shadow: inset 0 -2px 0 var(--cl-nav) !important;
 }
 
 /* ── Scrollbars ─────────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: var(--cl-bg); }
-::-webkit-scrollbar-thumb { background: #1d3553; border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: #2b527d; }
+::-webkit-scrollbar-thumb { background: #574b63; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #77658d; }
 
 /* ── Media queries globales ─────────────────────────────────────────────────── */
 @media (max-width: 1180px) {

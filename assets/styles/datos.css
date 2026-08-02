@@ -37,36 +37,6 @@
     white-space: nowrap;
 }
 
-/* ── Grid de métricas KPI ───────────────────────────────────────────────────── */
-.st-key-saved-models-card {
-    margin: 6px 0 22px;
-    border-color: #985b20 !important;
-    background: var(--cl-surface) !important;
-}
-
-.st-key-saved-models-card [data-testid="stMetric"] {
-    min-height: 94px;
-    padding: 2px 2px 0;
-    border: 0 !important;
-    background: transparent !important;
-}
-
-.st-key-saved-models-card [data-testid="stMetricLabel"] {
-    color: #ffab43 !important;
-    font-weight: 600;
-}
-
-.st-key-saved-models-card [data-testid="stMetricValue"] {
-    color: var(--cl-text) !important;
-    font-size: 2rem;
-    font-weight: 700;
-}
-
-.st-key-saved-models-card [data-testid="stCaptionContainer"] {
-    margin-top: -0.35rem;
-    padding-bottom: 2px;
-}
-
 /* ── Panel y tabla de datos ─────────────────────────────────────────────────── */
 .st-key-dataset-panel {
     padding: 3px;
@@ -79,8 +49,8 @@
     gap: 24px;
     margin: 18px 0 16px;
     padding: 16px 18px;
-    background: #091b30;
-    border: 1px solid #1a3553;
+    background: var(--cl-surface-raised);
+    border: 1px solid var(--cl-border-strong);
     border-radius: 8px;
 }
 
@@ -109,10 +79,10 @@
 .cl-filter-note {
     margin: 0 0 14px;
     padding: 8px 12px;
-    border: 1px solid #205a91;
+    border: 1px solid #3f7f7b;
     border-radius: 6px;
-    background: rgba(35, 136, 255, 0.09);
-    color: #a8d2ff;
+    background: rgba(95, 189, 181, 0.12);
+    color: #b9efea;
     font-size: 0.78rem;
 }
 
@@ -120,15 +90,15 @@
     overflow: hidden;
     border: 1px solid var(--cl-border) !important;
     border-radius: 9px !important;
-    background: #07172a !important;
+    background: var(--cl-surface) !important;
 }
 
 .cl-page-current {
     min-width: 38px;
     padding: 10px 13px;
-    border: 1px solid var(--cl-blue);
+    border: 1px solid var(--cl-nav);
     border-radius: 7px;
-    background: #0b3b73;
+    background: #4a3a68;
     color: #ffffff;
     font-size: 0.82rem;
     font-weight: 700;
@@ -191,7 +161,7 @@
 }
 
 .cl-quality-row:hover {
-    background: rgba(35, 136, 255, 0.05);
+    background: rgba(142, 117, 200, 0.08);
 }
 
 .cl-quality-label {

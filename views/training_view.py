@@ -191,7 +191,12 @@ def _renderizar_modelo_kmeans() -> None:
     firma = _firma_datos(datos_modelo, columnas_seleccionadas)
     servicio = ServicioEntrenamiento()
 
-    if st.button("Analizar K recomendado", type="secondary", width="content"):
+    if st.button(
+        "Analizar K recomendado",
+        type="secondary",
+        width="content",
+        icon=":material/query_stats:",
+    ):
         try:
             evaluaciones = servicio.evaluar_k(datos_modelo)
             st.session_state["evaluaciones_k"] = evaluaciones
@@ -281,6 +286,7 @@ def _renderizar_modelo_kmeans() -> None:
         f"Entrenar K-Means con {k_recomendado} grupos",
         type="primary",
         width="content",
+        icon=":material/model_training:",
     ):
         progreso = st.progress(0, text="Revisando los datos preparados...")
         try:
@@ -433,6 +439,7 @@ def renderizar_validacion_limpieza(
                     key="btn_limpiar_dataset_entrenamiento",
                     type="primary",
                     width="stretch",
+                    icon=":material/cleaning_services:",
                 ):
                     with st.spinner("Limpiando dataset…"):
                         res = limpiar_dataset(df)
@@ -571,6 +578,7 @@ def _renderizar_configuracion_likert(
                 "Cambiar asignación",
                 key="btn_cambiar_mapeo_likert",
                 type="secondary",
+                icon=":material/tune:",
             ):
                 _limpiar_estado_preparacion_entrenamiento()
                 st.rerun()
@@ -639,7 +647,9 @@ def _renderizar_configuracion_likert(
             aplicar = st.form_submit_button(
                 "Aplicar asignación",
                 type="primary",
+                key="btn_aplicar_asignacion_likert",
                 width="stretch",
+                icon=":material/check:",
             )
 
         if not aplicar:

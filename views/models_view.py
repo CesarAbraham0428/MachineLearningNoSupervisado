@@ -30,7 +30,7 @@ def _crear_tabla_modelos(modelos) -> pd.DataFrame:
 
 def renderizar_vista_modelos() -> None:
     """Muestra los modelos guardados sin exponer archivos internos."""
-    st.title("Modelos guardados")
+    st.title(":material/inventory_2: Modelos guardados")
     st.caption(
         "Consulta los entrenamientos almacenados para utilizarlos nuevamente "
         "en futuras ejecuciones."
@@ -42,6 +42,15 @@ def renderizar_vista_modelos() -> None:
         st.error(str(error), icon=":material/error:")
         return
 
+    with st.container(key="models-summary"):
+        st.metric(
+            label=":material/inventory_2: Modelos guardados",
+            value=f"{len(modelos):,}",
+            border=True,
+            width=360,
+            help="Cantidad de entrenamientos almacenados en el catálogo.",
+        )
+
     if not modelos:
         with st.container(border=True):
             st.subheader("Aún no hay modelos guardados")
@@ -51,13 +60,6 @@ def renderizar_vista_modelos() -> None:
                 icon=":material/info:",
             )
         return
-
-    st.metric(
-        "Modelos disponibles",
-        len(modelos),
-        border=True,
-        help="Cantidad de entrenamientos almacenados en el catálogo.",
-    )
 
     tabla = _crear_tabla_modelos(modelos)
     st.dataframe(

@@ -77,6 +77,7 @@ def _dialogo_guardar_modelo(resultado: ResultadoEntrenamiento) -> None:
             "Guardar modelo",
             type="primary",
             icon=":material/save:",
+            key="btn_guardar_modelo_form",
             width="stretch",
         )
 

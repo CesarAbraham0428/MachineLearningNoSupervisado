@@ -6,7 +6,6 @@ import streamlit as st
 
 from views.data_view import (
     renderizar_encabezado,
-    renderizar_metricas,
     renderizar_vista_datos,
 )
 from views.statistics_view import renderizar_vista_estadisticas
@@ -97,7 +96,6 @@ def main() -> None:
     # La primera vista debe explicar el producto y mostrar su estado antes de
     # pedirle al usuario que navegue por el flujo de análisis.
     renderizar_encabezado()
-    renderizar_metricas()
     tab_activa = _renderizar_navegacion()
 
     if tab_activa == 0:

@@ -7,7 +7,6 @@ from html import escape
 import pandas as pd
 import streamlit as st
 
-from services.model_service import ErrorModelo, ServicioModelo
 
 
 _SIN_FILTRO = "Sin filtro"
@@ -259,24 +258,6 @@ def renderizar_encabezado() -> None:
 
 
 
-def renderizar_metricas() -> None:
-    """Renderiza la única métrica global que debe permanecer visible."""
-    _inicializar_estado()
-    try:
-        modelos_guardados = ServicioModelo().contar_modelos()
-    except ErrorModelo:
-        modelos_guardados = len(st.session_state.modelos_guardados)
-
-    with st.container(border=True, width=420, key="saved-models-card"):
-        st.metric(
-            label=":material/inventory_2: Modelos guardados",
-            value=f"{modelos_guardados:,}",
-            help="Modelos disponibles para realizar consultas.",
-            width="stretch",
-        )
-        st.caption("Disponibles para consulta")
-
-
 def _renderizar_carga() -> None:
     """Renderiza el uploader únicamente cuando hace falta."""
     df_cargado = st.session_state.dataframe_cargado
@@ -297,7 +278,12 @@ def _renderizar_carga() -> None:
 
         if archivo is None:
             if df_cargado is not None:
-                if st.button("Cancelar", key="btn_cancelar_carga", type="secondary"):
+                if st.button(
+                    "Cancelar",
+                    key="btn_cancelar_carga",
+                    type="secondary",
+                    icon=":material/close:",
+                ):
                     st.session_state.mostrar_carga = False
                     st.rerun()
             return
@@ -389,6 +375,7 @@ def _renderizar_paginacion(pagina_actual: int, total_paginas: int) -> None:
             help="Primera página",
             type="secondary",
             width="content",
+            icon=":material/first_page:",
         ):
             st.session_state.pagina_actual = 1
             st.rerun()
@@ -432,6 +419,7 @@ def _renderizar_paginacion(pagina_actual: int, total_paginas: int) -> None:
             help="Última página",
             type="secondary",
             width="content",
+            icon=":material/last_page:",
         ):
             st.session_state.pagina_actual = total_paginas
             st.rerun()
@@ -453,6 +441,7 @@ def renderizar_vista_datos() -> None:
                     "Cargar conjunto de datos",
                     key="btn_abrir_carga",
                     type="primary",
+                    icon=":material/upload_file:",
                 ):
                     st.session_state.mostrar_carga = True
                     st.rerun()
@@ -532,6 +521,7 @@ def renderizar_vista_datos() -> None:
                 key="btn_exportar",
                 width="stretch",
                 help=etiqueta_ayuda,
+                icon=":material/download:",
             )
 
         with col_borrar:
@@ -541,6 +531,7 @@ def renderizar_vista_datos() -> None:
                 type="secondary",
                 width="stretch",
                 help="Elimina el conjunto de datos activo y vuelve a mostrar el apartado de carga",
+                icon=":material/delete:",
             ):
                 _limpiar_estado_dataset()
                 st.toast("Dataset eliminado")

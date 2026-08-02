@@ -7,3 +7,32 @@
 
 /* ── Placeholder: por ahora la vista muestra el estado vacío ────────────────── */
 /* Los estilos específicos de esta pestaña se añadirán cuando se implemente. */
+
+/* ── Resumen del catálogo ───────────────────────────────────────────────────── */
+.st-key-models-summary {
+    margin: 18px 0 24px;
+}
+
+.st-key-models-summary [data-testid="stMetric"] {
+    min-height: 96px;
+    border-color: var(--cl-nav) !important;
+    background: var(--cl-surface-raised) !important;
+    border-radius: 12px !important;
+}
+
+.st-key-models-summary [data-testid="stMetricLabel"] {
+    color: #d8cafa !important;
+    font-weight: 600;
+}
+
+.st-key-models-summary [data-testid="stMetricValue"] {
+    color: var(--cl-text) !important;
+    font-size: 2rem;
+    font-weight: 700;
+}
+
+/* El catálogo debe sentirse como una superficie de consulta, no como otro bloque azul. */
+[data-testid="stDataFrame"] {
+    border-color: var(--cl-border) !important;
+    background: var(--cl-surface) !important;
+}
