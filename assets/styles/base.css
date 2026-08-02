@@ -62,8 +62,9 @@ body,
 /* ── Navegación segmentada ──────────────────────────────────────────────────── */
 [data-testid="stSegmentedControl"] {
     width: 100%;
-    margin: 0 0 16px;
-    padding: 4px;
+    max-width: 980px;
+    margin: 6px 0 22px;
+    padding: 5px;
     background: var(--cl-surface);
     border: 1px solid var(--cl-border);
     border-radius: 10px;
@@ -74,12 +75,14 @@ body,
 }
 
 [data-testid="stSegmentedControl"] button {
-    min-height: 45px;
+    min-height: 52px;
+    padding: 11px 18px;
     border-radius: 7px !important;
     background: transparent !important;
     color: var(--cl-muted) !important;
-    font-size: 0.88rem;
-    font-weight: 500;
+    font-size: 0.93rem;
+    font-weight: 600;
+    white-space: nowrap;
     transition: color 160ms ease, background 160ms ease;
 }
 
@@ -107,7 +110,15 @@ body,
 
 @media (max-width: 640px) {
     section.main > div.block-container { padding: 18px 12px 28px; }
-    [data-testid="stSegmentedControl"] button { min-height: 40px; font-size: 0.75rem; }
+    [data-testid="stSegmentedControl"] {
+        max-width: 100%;
+        overflow-x: auto;
+    }
+    [data-testid="stSegmentedControl"] button {
+        min-height: 46px;
+        padding: 9px 12px;
+        font-size: 0.78rem;
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {

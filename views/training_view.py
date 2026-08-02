@@ -699,7 +699,7 @@ def renderizar_vista_entrenamiento() -> None:
     df_activo = _obtener_datos_activos()
     if df_activo is None:
         st.info(
-            "Carga un conjunto de datos en la pestaña '▦  Datos cargados' para verificar "
+            "Carga un conjunto de datos en la pestaña 'Datos cargados' para verificar "
             "su calidad y proceder con el entrenamiento."
         )
         return

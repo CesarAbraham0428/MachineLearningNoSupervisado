@@ -246,17 +246,6 @@ def _preparar_descarga(df: pd.DataFrame) -> tuple[bytes, str, str]:
     )
 
 
-def _icono_svg(nombre: str) -> str:
-    """Devuelve un glifo sobrio para las métricas, sin emojis ni texto técnico."""
-    glifos = {
-        "people": "••",
-        "columns": "▦",
-        "status": "✓",
-        "save": "▣",
-    }
-    return f'<span class="cl-icon-glyph cl-icon-glyph--{nombre}" aria-hidden="true">{glifos[nombre]}</span>'
-
-
 def renderizar_encabezado() -> None:
     """Renderiza el encabezado global del dashboard."""
     _inicializar_estado()
@@ -271,50 +260,21 @@ def renderizar_encabezado() -> None:
 
 
 def renderizar_metricas() -> None:
-    """Renderiza las métricas globales del dashboard, incluso en estado vacío."""
+    """Renderiza la única métrica global que debe permanecer visible."""
     _inicializar_estado()
-    df = st.session_state.dataframe_cargado
-    num_registros = len(df) if df is not None else 0
-    num_variables = len(df.columns) if df is not None else 0
-    modelo_entrenado = bool(st.session_state.modelo_entrenado)
     try:
         modelos_guardados = ServicioModelo().contar_modelos()
     except ErrorModelo:
         modelos_guardados = len(st.session_state.modelos_guardados)
 
-    estado_modelo = "Entrenado" if modelo_entrenado else "No entrenado"
-    estado_badge = "Listo" if modelo_entrenado else "Pendiente"
-    clase_badge = "cl-badge cl-badge--green" if modelo_entrenado else "cl-badge cl-badge--amber"
-
-    tarjetas = (
-        ("blue", "people", "Registros cargados", f"{num_registros:,}", "Disponible", "green"),
-        ("violet", "columns", "Variables detectadas", f"{num_variables:,}", "Columnas identificadas", "muted"),
-        ("green", "status", "Estado del modelo", estado_modelo, estado_badge, "status"),
-        ("amber", "save", "Modelos guardados", f"{modelos_guardados:,}", "Disponibles para consulta", "muted"),
-    )
-
-    html_tarjetas = [
-        '<div class="cl-metric-grid" role="list" aria-label="Resumen del proyecto">'
-    ]
-    for color, icono, etiqueta, valor, detalle, tipo_detalle in tarjetas:
-        if tipo_detalle == "green":
-            detalle_html = '<span class="cl-badge cl-badge--green">Disponible</span>'
-        elif tipo_detalle == "status":
-            detalle_html = f'<span class="{clase_badge}">{escape(detalle)}</span>'
-        else:
-            detalle_html = f'<span class="cl-metric-detail">{escape(detalle)}</span>'
-
-        html_tarjetas.append(
-            f'<article class="cl-metric-card cl-metric-card--{color}" role="listitem">'
-            f'<div class="cl-metric-icon">{_icono_svg(icono)}</div>'
-            '<div class="cl-metric-copy">'
-            f'<div class="cl-metric-label">{escape(etiqueta)}</div>'
-            f'<div class="cl-metric-value">{escape(valor)}</div>'
-            f"{detalle_html}"
-            "</div></article>"
+    with st.container(border=True, width=420, key="saved-models-card"):
+        st.metric(
+            label=":material/inventory_2: Modelos guardados",
+            value=f"{modelos_guardados:,}",
+            help="Modelos disponibles para realizar consultas.",
+            width="stretch",
         )
-    html_tarjetas.append("</div>")
-    st.html("".join(html_tarjetas))
+        st.caption("Disponibles para consulta")
 
 
 def _renderizar_carga() -> None:

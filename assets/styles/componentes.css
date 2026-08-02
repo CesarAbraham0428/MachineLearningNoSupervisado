@@ -185,10 +185,3 @@ button[kind="primary"]:hover {
     color: var(--cl-blue);
     font-size: 2.1rem;
 }
-
-.cl-empty-icon {
-    color: var(--cl-blue);
-    font-size: 2rem;
-    font-weight: 600;
-    line-height: 1;
-}

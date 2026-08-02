@@ -16,11 +16,11 @@ from views.models_view import renderizar_vista_modelos
 
 
 _SECCIONES = (
-    "▦  Datos cargados",
-    "▥  Estadística descriptiva",
-    "◈  Entrenamiento",
-    "⌁  Resultados",
-    "▣  Modelos guardados",
+    ":material/table_chart: Datos cargados",
+    ":material/bar_chart: Estadística descriptiva",
+    ":material/model_training: Entrenamiento",
+    ":material/query_stats: Resultados",
+    ":material/inventory_2: Modelos guardados",
 )
 
 
@@ -64,6 +64,7 @@ def _renderizar_navegacion() -> int:
         default=_SECCIONES[indice_actual],
         key="main_navigation",
         label_visibility="collapsed",
+        width="stretch",
     )
     seleccion = seleccion or _SECCIONES[indice_actual]
     indice_nuevo = _SECCIONES.index(seleccion)
@@ -77,13 +78,7 @@ def _renderizar_navegacion() -> int:
 def _renderizar_estado_vacio(titulo: str, descripcion: str, icono: str) -> None:
     """Muestra un estado de sección consistente, sin placeholders genéricos."""
     with st.container(border=True, key=f"empty-state-{icono}"):
-        simbolos = {
-            "bar_chart": "▥",
-            "model_training": "◈",
-            "query_stats": "⌁",
-            "inventory_2": "▣",
-        }
-        st.html(f'<div class="cl-empty-icon">{simbolos.get(icono, "·")}</div>')
+        st.markdown(f":material/{icono}:", text_alignment="center")
         st.subheader(titulo)
         st.caption(descripcion)
 

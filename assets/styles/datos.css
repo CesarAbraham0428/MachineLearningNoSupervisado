@@ -38,137 +38,33 @@
 }
 
 /* ── Grid de métricas KPI ───────────────────────────────────────────────────── */
-.cl-metric-grid {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 18px;
-    margin: 7px 0 20px;
+.st-key-saved-models-card {
+    margin: 6px 0 22px;
+    border-color: #985b20 !important;
+    background: var(--cl-surface) !important;
 }
 
-.cl-metric-card {
-    min-height: 108px;
-    display: flex;
-    align-items: center;
-    gap: 18px;
-    padding: 20px 22px;
-    background: var(--cl-surface);
-    border: 1px solid var(--cl-border-strong);
-    border-radius: 10px;
-    transition: background 160ms ease, border-color 160ms ease;
+.st-key-saved-models-card [data-testid="stMetric"] {
+    min-height: 94px;
+    padding: 2px 2px 0;
+    border: 0 !important;
+    background: transparent !important;
 }
 
-.cl-metric-card:hover {
-    background: var(--cl-surface-raised);
+.st-key-saved-models-card [data-testid="stMetricLabel"] {
+    color: #ffab43 !important;
+    font-weight: 600;
 }
 
-.cl-metric-card--blue   { border-color: #1b67ad; }
-.cl-metric-card--violet { border-color: #7241a9; }
-.cl-metric-card--green  { border-color: #1e8058; }
-.cl-metric-card--amber  { border-color: #985b20; }
-
-/* ── Ícono de la KPI card ───────────────────────────────────────────────────── */
-.cl-metric-icon {
-    width: 52px;
-    height: 52px;
-    flex: 0 0 52px;
-    display: grid;
-    place-items: center;
-    border-radius: 50%;
-    background: #0d2a50;
-    color: var(--cl-blue);
-}
-
-.cl-metric-card--violet .cl-metric-icon {
-    background: #241344;
-    color: var(--cl-violet);
-}
-
-.cl-metric-card--green .cl-metric-icon {
-    background: #0b392c;
-    color: var(--cl-green);
-}
-
-.cl-metric-card--amber .cl-metric-icon {
-    background: #3e2918;
-    color: var(--cl-amber);
-}
-
-.cl-metric-icon svg {
-    width: 27px;
-    height: 27px;
-}
-
-/* ── Glifos de ícono ────────────────────────────────────────────────────────── */
-.cl-icon-glyph {
-    position: relative;
-    display: block;
-    color: currentColor;
-    font-size: 1.55rem;
+.st-key-saved-models-card [data-testid="stMetricValue"] {
+    color: var(--cl-text) !important;
+    font-size: 2rem;
     font-weight: 700;
-    letter-spacing: -0.12em;
-    line-height: 1;
 }
 
-.cl-icon-glyph--people {
-    width: 27px;
-    height: 27px;
-    font-size: 0;
-    letter-spacing: 0;
-}
-
-.cl-icon-glyph--people::before {
-    position: absolute;
-    top: 1px;
-    left: 4px;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: currentColor;
-    box-shadow: 11px 1px 0 currentColor;
-    content: "";
-}
-
-.cl-icon-glyph--people::after {
-    position: absolute;
-    right: 0;
-    bottom: 1px;
-    left: 0;
-    height: 11px;
-    border-radius: 10px 10px 4px 4px;
-    background: currentColor;
-    content: "";
-}
-
-/* ── Texto de la KPI card ───────────────────────────────────────────────────── */
-.cl-metric-copy {
-    min-width: 0;
-}
-
-.cl-metric-label {
-    margin-bottom: 5px;
-    color: var(--cl-muted);
-    font-size: 0.83rem;
-    font-weight: 500;
-    line-height: 1.25;
-}
-
-.cl-metric-card--violet .cl-metric-label { color: #d19dff; }
-.cl-metric-card--green  .cl-metric-label { color: #6de8a5; }
-.cl-metric-card--amber  .cl-metric-label { color: #ffab43; }
-
-.cl-metric-value {
-    color: var(--cl-text);
-    font-size: 1.55rem;
-    font-weight: 700;
-    letter-spacing: -0.025em;
-    line-height: 1.1;
-}
-
-.cl-metric-detail {
-    display: block;
-    margin-top: 7px;
-    color: var(--cl-muted);
-    font-size: 0.78rem;
+.st-key-saved-models-card [data-testid="stCaptionContainer"] {
+    margin-top: -0.35rem;
+    padding-bottom: 2px;
 }
 
 /* ── Panel y tabla de datos ─────────────────────────────────────────────────── */
@@ -377,15 +273,9 @@
 }
 
 /* ── Media queries ──────────────────────────────────────────────────────────── */
-@media (max-width: 1180px) {
-    .cl-metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-
 @media (max-width: 640px) {
     .cl-hero-title    { font-size: 1.55rem; }
     .cl-hero-subtitle { font-size: 0.84rem; }
-    .cl-metric-grid   { grid-template-columns: 1fr; gap: 12px; }
-    .cl-metric-card   { min-height: 92px; padding: 16px 18px; }
     .cl-dataset-meta  { align-items: flex-start; flex-direction: column; gap: 12px; }
     .cl-meta-date     { text-align: left; }
 }
