@@ -5,16 +5,18 @@
 */
 
 /* ── Botones primarios ──────────────────────────────────────────────────────── */
-[data-testid="baseButton-primary"],
-button[kind="primary"] {
+.stButton > button[kind="primary"],
+.stButton > button[data-testid="stBaseButton-primary"],
+.stButton [data-testid="baseButton-primary"] {
     background: var(--cl-primary) !important;
     border: 1px solid var(--cl-primary-hover) !important;
     color: #ffffff !important;
     box-shadow: none !important;
 }
 
-[data-testid="baseButton-primary"]:hover,
-button[kind="primary"]:hover {
+.stButton > button[kind="primary"]:hover,
+.stButton > button[data-testid="stBaseButton-primary"]:hover,
+.stButton [data-testid="baseButton-primary"]:hover {
     background: var(--cl-primary-hover) !important;
     border-color: #3535A8 !important;
 }
@@ -185,8 +187,28 @@ button[kind="primary"]:hover {
     background: var(--cl-surface) !important;
 }
 
-[data-testid="stExpander"] summary > span > span:first-child,
-[data-testid="stFileUploader"] [data-testid="stIconMaterial"] {
+/* Streamlit monta los botones del uploader durante el rerun. Mantener el
+   botón de icono neutral evita que herede fugazmente el estilo primario. */
+[data-testid="stFileUploader"] button[data-testid="stBaseButton-borderlessIcon"] {
+    box-sizing: border-box;
+    width: 36px !important;
+    min-width: 36px !important;
+    height: 36px !important;
+    min-height: 36px !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 8px !important;
+    background: transparent !important;
+    color: var(--cl-muted) !important;
+}
+
+[data-testid="stFileUploader"] button[data-testid="stBaseButton-borderlessIcon"]:hover,
+[data-testid="stFileUploader"] button[data-testid="stBaseButton-borderlessIcon"]:focus-visible {
+    background: var(--cl-surface-soft) !important;
+    color: var(--cl-primary) !important;
+}
+
+[data-testid="stExpander"] summary > span > span:first-child {
     display: none !important;
 }
 

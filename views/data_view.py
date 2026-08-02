@@ -246,21 +246,27 @@ def _preparar_descarga(df: pd.DataFrame) -> tuple[bytes, str, str]:
 
 
 def _renderizar_carga() -> None:
-    """Renderiza el uploader únicamente cuando hace falta."""
+    """Renderiza la zona de carga cuando no hay dataset o se solicita reemplazo."""
     df_cargado = st.session_state.dataframe_cargado
-    mostrar = st.session_state.mostrar_carga
+    # Sin dataset, el uploader debe estar disponible desde el primer render.
+    # Cuando ya existe uno, `mostrar_carga` conserva el flujo para reemplazarlo.
+    mostrar = df_cargado is None or st.session_state.mostrar_carga
     if not mostrar:
         return
 
-    with st.expander(
-        "Cargar archivo de datos",
-        expanded=st.session_state.mostrar_carga or df_cargado is None,
-    ):
-        st.caption("Selecciona un archivo CSV o Excel (.xlsx / .xls) para incorporarlo al análisis.")
+    with st.container(border=True, key="upload-panel"):
+        st.markdown(":material/cloud_upload:", text_alignment="center")
+        st.subheader("Cargar archivo de datos", text_alignment="center")
+        st.caption(
+            "Selecciona un CSV o Excel para comenzar tu análisis de clustering.",
+            text_alignment="center",
+        )
         archivo = st.file_uploader(
-            "Selecciona un archivo",
+            ":material/upload_file: Selecciona un archivo",
             type=["csv", "xlsx", "xls"],
             key="file_uploader",
+            help="Formatos admitidos: CSV, XLSX y XLS. Tamaño máximo: 200 MB.",
+            width="stretch",
         )
 
         if archivo is None:
@@ -420,18 +426,6 @@ def renderizar_vista_datos() -> None:
 
     df_cargado: pd.DataFrame | None = st.session_state.dataframe_cargado
     if df_cargado is None:
-        if not st.session_state.mostrar_carga:
-            with st.container(border=True, key="empty-data-state"):
-                st.subheader("Aún no hay datos cargados")
-                st.caption("Haz clic en el botón a continuación para seleccionar un archivo CSV o Excel.")
-                if st.button(
-                    "Cargar conjunto de datos",
-                    key="btn_abrir_carga",
-                    type="primary",
-                    icon=":material/upload_file:",
-                ):
-                    st.session_state.mostrar_carga = True
-                    st.rerun()
         return
 
 
