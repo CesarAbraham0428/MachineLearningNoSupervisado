@@ -5,27 +5,38 @@
 */
 
 :root {
-    --cl-bg: #061326;
-    --cl-surface: #1d1a24;
-    --cl-surface-raised: #262230;
-    --cl-surface-soft: #30283d;
-    --cl-border: #40364d;
-    --cl-border-strong: #594d6b;
-    --cl-text: #f5f0f7;
-    --cl-muted: #c3b6ca;
-    --cl-subtle: #a79aad;
-    --cl-primary: #d88967;
-    --cl-primary-hover: #e9a078;
-    --cl-nav: #8e75c8;
-    --cl-nav-hover: #b9a3ed;
-    --cl-blue: #5ea7d9;
-    --cl-violet: #ac91f2;
-    --cl-teal: #5fbdb5;
-    --cl-teal-hover: #7bd2ca;
-    --cl-green: #57d29b;
-    --cl-amber: #f1b35b;
-    --cl-red: #e57d92;
-    --cl-red-hover: #f09aae;
+    /* ── Fondos y superficies ─── */
+    --cl-bg:             #FFFFFF;  /* fondo global = superficie: blanco puro */
+    --cl-surface:        #FFFFFF;  /* tarjetas / contenedores principales   */
+    --cl-surface-raised: #EEF1F8;  /* superficies elevadas (inputs, nav)    */
+    --cl-surface-soft:   #E4E8F4;  /* superficies sutiles (hover, badges)   */
+
+    /* ── Bordes ─── */
+    --cl-border:         #CDD2E8;  /* borde base                            */
+    --cl-border-strong:  #B0B8D8;  /* borde con énfasis                     */
+
+    /* ── Tipografía ─── */
+    --cl-text:           #1A1D2E;  /* texto principal: índigo casi negro    */
+    --cl-muted:          #4B5068;  /* texto secundario                      */
+    --cl-subtle:         #7880A0;  /* texto terciario / placeholders        */
+
+    /* ── Acento primario (índigo) ─── */
+    --cl-primary:        #5B5BD6;  /* acciones primarias                    */
+    --cl-primary-hover:  #4747C2;  /* hover del primario                    */
+
+    /* ── Navegación (violeta índigo) ─── */
+    --cl-nav:            #6366F1;  /* ítem activo de nav                    */
+    --cl-nav-hover:      #4F52CC;  /* hover nav                             */
+
+    /* ── Colores semánticos ─── */
+    --cl-blue:           #3B82F6;  /* informativo                           */
+    --cl-violet:         #7C3AED;  /* acento violeta                        */
+    --cl-teal:           #0D9488;  /* exportar / éxito suave                */
+    --cl-teal-hover:     #0B7A6E;  /* hover teal                            */
+    --cl-green:          #16A34A;  /* éxito                                 */
+    --cl-amber:          #D97706;  /* advertencia                           */
+    --cl-red:            #DC2626;  /* peligro / borrar                      */
+    --cl-red-hover:      #B91C1C;  /* hover rojo                            */
 }
 
 /* ── Streamlit chrome ───────────────────────────────────────────────────────── */
@@ -63,18 +74,41 @@ body,
 
 ::selection {
     color: #ffffff;
-    background: rgba(216, 137, 103, 0.35);
+    background: rgba(91, 91, 214, 0.40);
+}
+
+/* ── Tipografía global escalada ─────────────────────────────────────────────── */
+/* Sube el tamaño base de todos los textos de la app para mejor legibilidad     */
+[data-testid="stAppViewContainer"] p,
+[data-testid="stAppViewContainer"] span,
+[data-testid="stAppViewContainer"] li,
+[data-testid="stMarkdownContainer"] p {
+    font-size: 1rem !important;      /* 14px → 16px equivalente              */
+    line-height: 1.6;
+}
+
+[data-testid="stAppViewContainer"] label,
+[data-testid="stWidgetLabel"] {
+    font-size: 0.95rem !important;   /* labels de controles más legibles     */
+    font-weight: 600;
+}
+
+/* Captions y ayudas ─ un poco más grandes que antes */
+[data-testid="stCaptionContainer"] p,
+.stCaption p {
+    font-size: 0.88rem !important;
 }
 
 /* ── Navegación segmentada ──────────────────────────────────────────────────── */
 [data-testid="stSegmentedControl"] {
     width: 100%;
-    max-width: 980px;
-    margin: 6px 0 22px;
-    padding: 5px;
-    background: var(--cl-surface-raised);
+    max-width: 1100px;               /* más ancho para que quepan bien las pestañas */
+    margin: 6px 0 26px;
+    padding: 6px;
+    background: var(--cl-surface);
     border: 1px solid var(--cl-border-strong);
-    border-radius: 10px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(91, 91, 214, 0.10);
 }
 
 [data-testid="stSegmentedControl"] > div {
@@ -82,33 +116,34 @@ body,
 }
 
 [data-testid="stSegmentedControl"] button {
-    min-height: 52px;
-    padding: 11px 18px;
-    border-radius: 7px !important;
+    min-height: 62px;                /* antes 52px — un 20% más alto         */
+    padding: 14px 22px;              /* más respiro interno                  */
+    border-radius: 8px !important;
     background: transparent !important;
     color: var(--cl-muted) !important;
-    font-size: 0.93rem;
+    font-size: 1.05rem;              /* antes 0.93rem — texto más grande     */
     font-weight: 600;
+    letter-spacing: -0.01em;
     white-space: nowrap;
     transition: color 160ms ease, background 160ms ease;
 }
 
 [data-testid="stSegmentedControl"] button:hover {
-    color: var(--cl-text) !important;
-    background: rgba(142, 117, 200, 0.14) !important;
+    color: var(--cl-primary) !important;
+    background: rgba(91, 91, 214, 0.08) !important;
 }
 
 [data-testid="stSegmentedControl"] button[aria-checked="true"] {
-    color: #eadfff !important;
-    background: #382f4b !important;
-    box-shadow: inset 0 -2px 0 var(--cl-nav) !important;
+    color: var(--cl-primary) !important;
+    background: rgba(91, 91, 214, 0.12) !important;
+    box-shadow: inset 0 -3px 0 var(--cl-nav) !important;  /* línea activa más gruesa */
 }
 
 /* ── Scrollbars ─────────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-track { background: var(--cl-bg); }
-::-webkit-scrollbar-thumb { background: #574b63; border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: #77658d; }
+::-webkit-scrollbar-track { background: #FFFFFF; }
+::-webkit-scrollbar-thumb { background: var(--cl-border-strong); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #8892B8; }
 
 /* ── Media queries globales ─────────────────────────────────────────────────── */
 @media (max-width: 1180px) {
@@ -122,9 +157,9 @@ body,
         overflow-x: auto;
     }
     [data-testid="stSegmentedControl"] button {
-        min-height: 46px;
-        padding: 9px 12px;
-        font-size: 0.78rem;
+        min-height: 54px;
+        padding: 10px 14px;
+        font-size: 0.9rem;
     }
 }
 

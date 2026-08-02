@@ -5,9 +5,6 @@
    panel de comparación, acciones de exportar/eliminar, etc.
 */
 
-/* ── Placeholder: por ahora la vista muestra el estado vacío ────────────────── */
-/* Los estilos específicos de esta pestaña se añadirán cuando se implemente. */
-
 /* ── Resumen del catálogo ───────────────────────────────────────────────────── */
 .st-key-models-summary {
     margin: 18px 0 24px;
@@ -16,12 +13,12 @@
 .st-key-models-summary [data-testid="stMetric"] {
     min-height: 96px;
     border-color: var(--cl-nav) !important;
-    background: var(--cl-surface-raised) !important;
+    background: var(--cl-surface) !important;
     border-radius: 12px !important;
 }
 
 .st-key-models-summary [data-testid="stMetricLabel"] {
-    color: #d8cafa !important;
+    color: var(--cl-primary) !important;
     font-weight: 600;
 }
 

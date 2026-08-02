@@ -1,14 +1,14 @@
 [theme]
-base = "dark"
-primaryColor = "#D88967"
-backgroundColor = "#061326"
-secondaryBackgroundColor = "#211D29"
-textColor = "#F5F0F7"
-linkColor = "#B99AEF"
-borderColor = "#40364D"
+base = "light"
+primaryColor = "#5B5BD6"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#ffffffff"
+textColor = "#1A1D2E"
+linkColor = "#6366F1"
+borderColor = "#CDD2E8"
 font = "'IBM Plex Sans':https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
 headingFont = "'IBM Plex Sans':https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@500;600;700&display=swap"
-baseFontSize = 14
+baseFontSize = 16
 baseFontWeight = 400
 headingFontSizes = ["32px", "24px", "20px", "16px", "14px", "12px"]
 headingFontWeights = [700, 700, 600, 600, 500, 500]
@@ -17,21 +17,21 @@ buttonRadius = "small"
 showWidgetBorder = true
 showSidebarBorder = true
 linkUnderline = false
-redColor = "#E57D92"
-orangeColor = "#D88967"
-yellowColor = "#F1B35B"
-greenColor = "#57D29B"
-blueColor = "#5EA7D9"
-violetColor = "#AC91F2"
-grayColor = "#A79AAD"
-dataframeBorderColor = "#40364D"
-dataframeHeaderBackgroundColor = "#2C2537"
-chartCategoricalColors = ["#D88967", "#5FBDB5", "#AC91F2", "#F1B35B", "#E57D92", "#5EA7D9"]
-chartSequentialColors = ["#F5F0F7", "#E7D7D0", "#D9B4A5", "#CB9480", "#D88967", "#B66F58", "#8F5948", "#6E4439", "#4B3030", "#2B2024"]
+redColor = "#DC2626"
+orangeColor = "#EA580C"
+yellowColor = "#D97706"
+greenColor = "#16A34A"
+blueColor = "#3B82F6"
+violetColor = "#7C3AED"
+grayColor = "#7880A0"
+dataframeBorderColor = "#ffffffff"
+dataframeHeaderBackgroundColor = "#EEF1F8"
+chartCategoricalColors = ["#5B5BD6", "#0D9488", "#7C3AED", "#D97706", "#DC2626", "#3B82F6"]
+chartSequentialColors = ["#EEF2FF", "#C7D2FE", "#A5B4FC", "#818CF8", "#6366F1", "#4F46E5", "#4338CA", "#3730A3", "#312E81", "#1E1B4B"]
 
 [theme.sidebar]
-backgroundColor = "#191620"
-secondaryBackgroundColor = "#241F2C"
-textColor = "#F5F0F7"
-borderColor = "#40364D"
-primaryColor = "#AC91F2"
+backgroundColor = "#F0F2F8"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#1A1D2E"
+borderColor = "#CDD2E8"
+primaryColor = "#5B5BD6"

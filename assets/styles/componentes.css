@@ -16,21 +16,21 @@ button[kind="primary"] {
 [data-testid="baseButton-primary"]:hover,
 button[kind="primary"]:hover {
     background: var(--cl-primary-hover) !important;
-    border-color: #f0b195 !important;
+    border-color: #3535A8 !important;
 }
 
 /* ── Botones generales ──────────────────────────────────────────────────────── */
 .stButton > button,
 .stDownloadButton > button {
-    min-height: 38px;
+    min-height: 40px;
     border-radius: 8px !important;
     border: 1px solid var(--cl-border-strong) !important;
-    background: transparent !important;
+    background: var(--cl-surface) !important;
     color: var(--cl-text) !important;
-    box-shadow: none !important;
-    font-size: 0.84rem;
+    box-shadow: 0 1px 3px rgba(26, 29, 46, 0.08) !important;
+    font-size: 0.95rem;            /* antes 0.84rem */
     font-weight: 600;
-    transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+    transition: background 160ms ease, border-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
 }
 
 .stButton button *,
@@ -43,9 +43,10 @@ button[kind="primary"]:hover {
 
 .stButton > button:hover,
 .stDownloadButton > button:hover {
-    background: rgba(216, 137, 103, 0.12) !important;
+    background: var(--cl-surface-soft) !important;
     border-color: var(--cl-primary) !important;
-    color: #ffd8c8 !important;
+    color: var(--cl-primary) !important;
+    box-shadow: 0 2px 6px rgba(91, 91, 214, 0.14) !important;
 }
 
 .stButton > button[kind="primary"],
@@ -58,7 +59,7 @@ button[kind="primary"]:hover {
 .stButton > button[kind="primary"]:hover,
 .stButton > button[data-testid="stBaseButton-primary"]:hover {
     background: var(--cl-primary-hover) !important;
-    border-color: #f0b195 !important;
+    border-color: #3535A8 !important;
 }
 
 /* ── Colores semánticos para acciones ──────────────────────────────────────── */
@@ -66,28 +67,28 @@ button[kind="primary"]:hover {
 .st-key-descargar_reporte_estadistico button {
     background: var(--cl-teal) !important;
     border-color: var(--cl-teal-hover) !important;
-    color: #102522 !important;
+    color: #ffffff !important;
 }
 
 .st-key-btn_exportar button:hover,
 .st-key-descargar_reporte_estadistico button:hover {
     background: var(--cl-teal-hover) !important;
-    border-color: #a5e7e0 !important;
-    color: #102522 !important;
+    border-color: #075E55 !important;
+    color: #ffffff !important;
 }
 
 .st-key-btn_borrar_dataset button,
 .st-key-btn_limpiar_dataset_entrenamiento button[kind="primary"] {
     background: var(--cl-red) !important;
     border-color: var(--cl-red-hover) !important;
-    color: #2b1018 !important;
+    color: #ffffff !important;
 }
 
 .st-key-btn_borrar_dataset button:hover,
 .st-key-btn_limpiar_dataset_entrenamiento button[kind="primary"]:hover {
     background: var(--cl-red-hover) !important;
-    border-color: #ffc0cd !important;
-    color: #2b1018 !important;
+    border-color: #991B1B !important;
+    color: #ffffff !important;
 }
 
 .st-key-btn_limpiar_dataset_entrenamiento button[kind="primary"] {
@@ -98,22 +99,22 @@ button[kind="primary"]:hover {
 .st-key-btn_abrir_guardar_modelo button[kind="primary"],
 .st-key-btn_aplicar_asignacion_likert button[kind="primary"] {
     background: var(--cl-green) !important;
-    border-color: #85e7b9 !important;
-    color: #10261c !important;
+    border-color: #15803D !important;
+    color: #ffffff !important;
 }
 
 .st-key-btn_guardar_modelo_form button[kind="primary"]:hover,
 .st-key-btn_abrir_guardar_modelo button[kind="primary"]:hover,
 .st-key-btn_aplicar_asignacion_likert button[kind="primary"]:hover {
-    background: #78e4af !important;
-    border-color: #b4f3d1 !important;
-    color: #10261c !important;
+    background: #15803D !important;
+    border-color: #166534 !important;
+    color: #ffffff !important;
 }
 
 .stButton > button:focus-visible,
 .stDownloadButton > button:focus-visible,
 [data-testid="stSegmentedControl"] button:focus-visible {
-    outline: 2px solid var(--cl-nav-hover) !important;
+    outline: 2px solid var(--cl-nav) !important;
     outline-offset: 2px;
 }
 
@@ -122,21 +123,23 @@ button[kind="primary"]:hover {
     display: inline-flex;
     align-items: center;
     margin-top: 7px;
-    padding: 3px 9px;
+    padding: 4px 10px;
     border-radius: 4px;
-    font-size: 0.72rem;
+    font-size: 0.82rem;           /* antes 0.72rem */
     font-weight: 700;
     line-height: 1.1;
 }
 
 .cl-badge--green {
-    background: #0d6b49;
-    color: #d4ffea;
+    background: #DCFCE7;
+    color: #166534;
+    border: 1px solid #BBF7D0;
 }
 
 .cl-badge--amber {
-    background: #f0a313;
-    color: #1b170b;
+    background: #FEF3C7;
+    color: #92400E;
+    border: 1px solid #FDE68A;
 }
 
 /* ── Superficies con borde (containers) ─────────────────────────────────────── */
@@ -166,19 +169,20 @@ button[kind="primary"]:hover {
 [data-testid="stSelectbox"] label,
 [data-testid="stFileUploader"] label {
     color: var(--cl-muted) !important;
-    font-size: 0.74rem !important;
+    font-size: 0.9rem !important;  /* antes 0.74rem — mucho más legible */
     font-weight: 600 !important;
 }
 
 [data-testid="stSelectbox"] > div > div,
 [data-testid="stNumberInput"] > div > div {
     border-color: var(--cl-border-strong) !important;
-    background: var(--cl-surface-raised) !important;
+    background: var(--cl-surface) !important;
+    color: var(--cl-text) !important;
 }
 
 [data-testid="stFileUploader"] {
     border-color: var(--cl-border-strong) !important;
-    background: var(--cl-surface-raised) !important;
+    background: var(--cl-surface) !important;
 }
 
 [data-testid="stExpander"] summary > span > span:first-child,
