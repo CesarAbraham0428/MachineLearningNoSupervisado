@@ -245,19 +245,6 @@ def _preparar_descarga(df: pd.DataFrame) -> tuple[bytes, str, str]:
     )
 
 
-def renderizar_encabezado() -> None:
-    """Renderiza el encabezado global del dashboard."""
-    _inicializar_estado()
-    st.markdown(
-        '<div class="cl-hero">'
-        '<h1 class="cl-hero-title">Dashboard de procesamiento</h1>'
-        '<p class="cl-hero-subtitle">Administra los datos, el entrenamiento y los resultados desde un solo lugar.</p>'
-        "</div>",
-        unsafe_allow_html=True,
-    )
-
-
-
 def _renderizar_carga() -> None:
     """Renderiza el uploader únicamente cuando hace falta."""
     df_cargado = st.session_state.dataframe_cargado

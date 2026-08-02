@@ -4,14 +4,12 @@ import pathlib
 
 import streamlit as st
 
-from views.data_view import (
-    renderizar_encabezado,
-    renderizar_vista_datos,
-)
+from views.data_view import renderizar_vista_datos
 from views.statistics_view import renderizar_vista_estadisticas
 from views.training_view import renderizar_vista_entrenamiento
 from views.results_view import renderizar_vista_resultados
 from views.models_view import renderizar_vista_modelos
+from services.model_service import ErrorModelo, ServicioModelo
 
 
 _SECCIONES = (
@@ -54,19 +52,27 @@ def _cargar_estilos() -> None:
 
 def _renderizar_navegacion() -> int:
     """Renderiza una única navegación segmentada y devuelve la sección activa."""
+    try:
+        modelos_guardados = ServicioModelo().contar_modelos()
+    except ErrorModelo:
+        modelos_guardados = 0
+
+    secciones = _SECCIONES[:-1] + (
+        f":material/inventory_2: Modelos guardados ({modelos_guardados:,})",
+    )
     indice_actual = st.session_state.get("tab_activa", 0)
-    indice_actual = max(0, min(indice_actual, len(_SECCIONES) - 1))
+    indice_actual = max(0, min(indice_actual, len(secciones) - 1))
 
     seleccion = st.segmented_control(
         "Secciones del flujo",
-        options=list(_SECCIONES),
-        default=_SECCIONES[indice_actual],
+        options=list(secciones),
+        default=secciones[indice_actual],
         key="main_navigation",
         label_visibility="collapsed",
         width="stretch",
     )
-    seleccion = seleccion or _SECCIONES[indice_actual]
-    indice_nuevo = _SECCIONES.index(seleccion)
+    seleccion = seleccion or secciones[indice_actual]
+    indice_nuevo = secciones.index(seleccion)
 
     if indice_nuevo != indice_actual:
         st.session_state.tab_activa = indice_nuevo
@@ -93,9 +99,6 @@ def main() -> None:
 
     _cargar_estilos()
 
-    # La primera vista debe explicar el producto y mostrar su estado antes de
-    # pedirle al usuario que navegue por el flujo de análisis.
-    renderizar_encabezado()
     tab_activa = _renderizar_navegacion()
 
     if tab_activa == 0:

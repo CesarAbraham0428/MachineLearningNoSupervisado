@@ -229,6 +229,48 @@ def _mostrar_contexto_resultado(resultado: ResultadoEntrenamiento) -> None:
         )
 
 
+def _renderizar_tarjetas_resultado(resultado: ResultadoEntrenamiento) -> None:
+    """Muestra las métricas del entrenamiento como tarjetas diferenciadas."""
+    tarjetas = (
+        (
+            "grupos",
+            ":material/groups: Grupos encontrados",
+            resultado.k_usado,
+            "Cantidad de grupos generados por K-Means.",
+        ),
+        (
+            "registros",
+            ":material/table_rows: Registros agrupados",
+            len(resultado.asignaciones),
+            "Registros incluidos en la asignación del modelo.",
+        ),
+        (
+            "variables",
+            ":material/tune: Variables utilizadas",
+            len(resultado.columnas),
+            "Variables empleadas para entrenar el modelo.",
+        ),
+        (
+            "calidad",
+            ":material/insights: Calidad de separación",
+            f"{resultado.silhouette:.3f}",
+            "Silhouette: mientras más cerca de 1, más claros son los grupos.",
+        ),
+        (
+            "distancia",
+            ":material/straighten: Distancia interna",
+            f"{resultado.inercia:,.1f}",
+            "Inercia del modelo: un valor menor indica grupos más compactos.",
+        ),
+    )
+
+    metricas = st.columns(len(tarjetas), gap="medium")
+    for columna, (clave, etiqueta, valor, ayuda) in zip(metricas, tarjetas):
+        with columna:
+            with st.container(border=True, key=f"result-metric-card-{clave}"):
+                st.metric(etiqueta, valor, help=ayuda)
+
+
 def renderizar_vista_resultados() -> None:
     """Renderiza métricas, gráficas y tablas del último modelo entrenado."""
     st.title("Resultados del entrenamiento")
@@ -270,35 +312,7 @@ def renderizar_vista_resultados() -> None:
         st.error(str(error))
         return
 
-    with st.container(horizontal=True):
-        st.metric(
-            "Grupos encontrados",
-            resultado.k_usado,
-            border=True,
-            help="Cantidad de grupos generados por K-Means.",
-        )
-        st.metric(
-            "Registros agrupados",
-            len(resultado.asignaciones),
-            border=True,
-        )
-        st.metric(
-            "Variables utilizadas",
-            len(resultado.columnas),
-            border=True,
-        )
-        st.metric(
-            "Calidad de separación",
-            f"{resultado.silhouette:.3f}",
-            border=True,
-            help="Silhouette: mientras más cerca de 1, más claros son los grupos.",
-        )
-        st.metric(
-            "Distancia interna",
-            f"{resultado.inercia:,.1f}",
-            border=True,
-            help="Inercia del modelo: un valor menor indica grupos más compactos.",
-        )
+    _renderizar_tarjetas_resultado(resultado)
 
     _mostrar_lectura_silhouette(resultado)
     _mostrar_contexto_resultado(resultado)

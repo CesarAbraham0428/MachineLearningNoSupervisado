@@ -86,6 +86,45 @@ def _grafica_histograma(resumen: ResumenEstadistico, pregunta: str):
     )
 
 
+def _renderizar_tarjetas_metricas(
+    resumen: ResumenEstadistico,
+    faltantes: int,
+) -> None:
+    """Muestra los indicadores principales como tarjetas visuales comparables."""
+    tarjetas = (
+        (
+            "registros",
+            ":material/table_rows: Registros analizados",
+            f"{resumen.cantidad_registros:,}",
+            "Filas disponibles en el conjunto de datos activo.",
+        ),
+        (
+            "variables",
+            ":material/tune: Variables analizadas",
+            f"{resumen.cantidad_variables:,}",
+            "Preguntas o columnas incluidas en el análisis.",
+        ),
+        (
+            "respuestas",
+            ":material/quiz: Respuestas evaluadas",
+            f"{resumen.cantidad_registros * resumen.cantidad_variables:,}",
+            "Total de valores revisados en la matriz de respuestas.",
+        ),
+        (
+            "faltantes",
+            ":material/error_outline: Datos faltantes",
+            f"{faltantes:,}",
+            "Valores ausentes detectados en las preguntas analizadas.",
+        ),
+    )
+
+    metricas = st.columns(len(tarjetas), gap="medium")
+    for columna, (clave, etiqueta, valor, ayuda) in zip(metricas, tarjetas):
+        with columna:
+            with st.container(border=True, key=f"metric-card-{clave}"):
+                st.metric(etiqueta, valor, help=ayuda)
+
+
 def renderizar_vista_estadisticas() -> None:
     """Muestra todos los datos estadísticos y gráficas en una sola sección."""
     st.header("Estadística descriptiva")
@@ -122,11 +161,7 @@ def renderizar_vista_estadisticas() -> None:
         )
 
     faltantes = int(resumen.faltantes_por_pregunta.sum())
-    metricas = st.columns(4)
-    metricas[0].metric("Registros analizados", resumen.cantidad_registros)
-    metricas[1].metric("Variables analizadas", resumen.cantidad_variables)
-    metricas[2].metric("Respuestas evaluadas", resumen.cantidad_registros * resumen.cantidad_variables)
-    metricas[3].metric("Datos faltantes", faltantes)
+    _renderizar_tarjetas_metricas(resumen, faltantes)
 
     st.subheader("Medidas estadísticas por pregunta")
     st.dataframe(resumen.estadisticas_por_pregunta, width="stretch")

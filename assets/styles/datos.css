@@ -1,36 +1,11 @@
 /*
    ClusterLab — datos.css
    Estilos específicos de la pestaña "▦ Datos cargados".
-   Cubre: hero, KPI cards, tabla de datos, metadata del dataset
+   Cubre: KPI cards, tabla de datos, metadata del dataset
    y botón de carga.
 */
 
 /* ── Hero ───────────────────────────────────────────────────────────────────── */
-.cl-hero {
-    min-height: 76px;
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-start;
-    gap: 7px;
-}
-
-.cl-hero-title {
-    margin: 0;
-    color: var(--cl-text);
-    font-size: clamp(1.65rem, 2.2vw, 2.1rem);
-    font-weight: 700;
-    letter-spacing: -0.035em;
-    line-height: 1.08;
-}
-
-.cl-hero-subtitle {
-    max-width: 70ch;
-    margin: 0;
-    color: var(--cl-muted);
-    font-size: 1rem;              /* antes 0.92rem */
-    line-height: 1.55;
-}
-
 /* ── Botón de carga ─────────────────────────────────────────────────────────── */
 .st-key-btn_abrir_carga button {
     min-width: 214px;
@@ -244,8 +219,6 @@
 
 /* ── Media queries ──────────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
-    .cl-hero-title    { font-size: 1.55rem; }
-    .cl-hero-subtitle { font-size: 0.84rem; }
     .cl-dataset-meta  { align-items: flex-start; flex-direction: column; gap: 12px; }
     .cl-meta-date     { text-align: left; }
 }
