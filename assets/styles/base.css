@@ -1,0 +1,172 @@
+/*
+   ClusterLab — base.css
+   Variables de diseño, reset, tipografía y layout global.
+   Este archivo se carga en TODAS las pestañas.
+*/
+
+:root {
+    /* ── Fondos y superficies ─── */
+    --cl-bg:             #FFFFFF;  /* fondo global = superficie: blanco puro */
+    --cl-surface:        #FFFFFF;  /* tarjetas / contenedores principales   */
+    --cl-surface-raised: #EEF1F8;  /* superficies elevadas (inputs, nav)    */
+    --cl-surface-soft:   #E4E8F4;  /* superficies sutiles (hover, badges)   */
+
+    /* ── Bordes ─── */
+    --cl-border:         #CDD2E8;  /* borde base                            */
+    --cl-border-strong:  #B0B8D8;  /* borde con énfasis                     */
+
+    /* ── Tipografía ─── */
+    --cl-text:           #1A1D2E;  /* texto principal: índigo casi negro    */
+    --cl-muted:          #4B5068;  /* texto secundario                      */
+    --cl-subtle:         #7880A0;  /* texto terciario / placeholders        */
+
+    /* ── Acento primario (índigo) ─── */
+    --cl-primary:        #5B5BD6;  /* acciones primarias                    */
+    --cl-primary-hover:  #4747C2;  /* hover del primario                    */
+
+    /* ── Navegación (violeta índigo) ─── */
+    --cl-nav:            #6366F1;  /* ítem activo de nav                    */
+    --cl-nav-hover:      #4F52CC;  /* hover nav                             */
+
+    /* ── Colores semánticos ─── */
+    --cl-blue:           #3B82F6;  /* informativo                           */
+    --cl-violet:         #7C3AED;  /* acento violeta                        */
+    --cl-teal:           #0D9488;  /* exportar / éxito suave                */
+    --cl-teal-hover:     #0B7A6E;  /* hover teal                            */
+    --cl-green:          #16A34A;  /* éxito                                 */
+    --cl-amber:          #D97706;  /* advertencia                           */
+    --cl-red:            #DC2626;  /* peligro / borrar                      */
+    --cl-red-hover:      #B91C1C;  /* hover rojo                            */
+}
+
+/* ── Streamlit chrome ───────────────────────────────────────────────────────── */
+#MainMenu,
+footer,
+[data-testid="stToolbar"],
+[data-testid="stDecoration"] {
+    visibility: hidden;
+}
+
+.stApp,
+[data-testid="stAppViewContainer"] {
+    background: var(--cl-bg) !important;
+    color: var(--cl-text) !important;
+}
+
+section.main > div.block-container {
+    max-width: 1480px;
+    padding: 24px 30px 48px;
+}
+
+html,
+body,
+[data-testid="stAppViewContainer"],
+[data-testid="stAppViewContainer"] * {
+    font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+}
+
+[data-testid="stIconMaterial"] {
+    font-family: "Material Symbols Rounded", "Material Symbols Outlined", sans-serif !important;
+    font-weight: normal;
+    font-style: normal;
+    line-height: 1;
+}
+
+::selection {
+    color: #ffffff;
+    background: rgba(91, 91, 214, 0.40);
+}
+
+/* ── Tipografía global escalada ─────────────────────────────────────────────── */
+/* Sube el tamaño base de todos los textos de la app para mejor legibilidad     */
+[data-testid="stAppViewContainer"] p,
+[data-testid="stAppViewContainer"] span,
+[data-testid="stAppViewContainer"] li,
+[data-testid="stMarkdownContainer"] p {
+    font-size: 1rem !important;      /* 14px → 16px equivalente              */
+    line-height: 1.6;
+}
+
+[data-testid="stAppViewContainer"] label,
+[data-testid="stWidgetLabel"] {
+    font-size: 0.95rem !important;   /* labels de controles más legibles     */
+    font-weight: 600;
+}
+
+/* Captions y ayudas ─ un poco más grandes que antes */
+[data-testid="stCaptionContainer"] p,
+.stCaption p {
+    font-size: 0.88rem !important;
+}
+
+/* ── Navegación segmentada ──────────────────────────────────────────────────── */
+[data-testid="stSegmentedControl"] {
+    width: 100%;
+    max-width: 1100px;               /* más ancho para que quepan bien las pestañas */
+    margin: 6px 0 26px;
+    padding: 6px;
+    background: var(--cl-surface);
+    border: 1px solid var(--cl-border-strong);
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(91, 91, 214, 0.10);
+}
+
+[data-testid="stSegmentedControl"] > div {
+    gap: 0 !important;
+}
+
+[data-testid="stSegmentedControl"] button {
+    min-height: 62px;                /* antes 52px — un 20% más alto         */
+    padding: 14px 22px;              /* más respiro interno                  */
+    border-radius: 8px !important;
+    background: transparent !important;
+    color: var(--cl-muted) !important;
+    font-size: 1.05rem;              /* antes 0.93rem — texto más grande     */
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+    transition: color 160ms ease, background 160ms ease;
+}
+
+[data-testid="stSegmentedControl"] button:hover {
+    color: var(--cl-primary) !important;
+    background: rgba(91, 91, 214, 0.08) !important;
+}
+
+[data-testid="stSegmentedControl"] button[aria-checked="true"] {
+    color: var(--cl-primary) !important;
+    background: rgba(91, 91, 214, 0.12) !important;
+    box-shadow: inset 0 -3px 0 var(--cl-nav) !important;  /* línea activa más gruesa */
+}
+
+/* ── Scrollbars ─────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: #FFFFFF; }
+::-webkit-scrollbar-thumb { background: var(--cl-border-strong); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #8892B8; }
+
+/* ── Media queries globales ─────────────────────────────────────────────────── */
+@media (max-width: 1180px) {
+    section.main > div.block-container { padding: 20px 18px 36px; }
+}
+
+@media (max-width: 640px) {
+    section.main > div.block-container { padding: 18px 12px 28px; }
+    [data-testid="stSegmentedControl"] {
+        max-width: 100%;
+        overflow-x: auto;
+    }
+    [data-testid="stSegmentedControl"] button {
+        min-height: 54px;
+        padding: 10px 14px;
+        font-size: 0.9rem;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+    }
+}

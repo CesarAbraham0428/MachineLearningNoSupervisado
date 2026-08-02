@@ -1,0 +1,105 @@
+/*
+   ClusterLab — resultados.css
+   Estilos específicos de la pestaña "⌁ Resultados".
+   Cubre: métricas de clústeres, gráficas de dispersión PCA,
+   tabla de asignaciones, panel de evaluación, etc.
+*/
+
+/* ── Estilos específicos de la vista ─────────────────────────────────────── */
+/* Los estilos específicos de esta pestaña viven aquí para mantener aislada la UI. */
+
+/* Tarjetas de métricas del entrenamiento */
+.st-key-result-metric-card-grupos,
+.st-key-result-metric-card-registros,
+.st-key-result-metric-card-variables,
+.st-key-result-metric-card-calidad,
+.st-key-result-metric-card-distancia {
+    min-height: 112px;
+    padding: 8px 12px 6px;
+    border-radius: 14px !important;
+}
+
+.st-key-result-metric-card-grupos {
+    background: #F1F4FF !important;
+    border-color: #CDD6FF !important;
+}
+
+.st-key-result-metric-card-registros {
+    background: #EFFBF8 !important;
+    border-color: #C5EEE5 !important;
+}
+
+.st-key-result-metric-card-variables {
+    background: #F6F1FF !important;
+    border-color: #E1D4FF !important;
+}
+
+.st-key-result-metric-card-calidad {
+    background: #FDF2F8 !important;
+    border-color: #F3C7DA !important;
+}
+
+.st-key-result-metric-card-distancia {
+    background: #FFF8E8 !important;
+    border-color: #F6DFB1 !important;
+}
+
+.st-key-result-metric-card-grupos [data-testid="stMetric"],
+.st-key-result-metric-card-registros [data-testid="stMetric"],
+.st-key-result-metric-card-variables [data-testid="stMetric"],
+.st-key-result-metric-card-calidad [data-testid="stMetric"],
+.st-key-result-metric-card-distancia [data-testid="stMetric"] {
+    min-height: 90px;
+    padding: 4px 2px;
+    background: transparent !important;
+}
+
+.st-key-result-metric-card-grupos [data-testid="stMetricLabel"] {
+    color: #3F4F92 !important;
+}
+
+.st-key-result-metric-card-grupos [data-testid="stMetricValue"] {
+    color: #365BD8 !important;
+}
+
+.st-key-result-metric-card-registros [data-testid="stMetricLabel"] {
+    color: #2F6E65 !important;
+}
+
+.st-key-result-metric-card-registros [data-testid="stMetricValue"] {
+    color: #0F766E !important;
+}
+
+.st-key-result-metric-card-variables [data-testid="stMetricLabel"] {
+    color: #5F4293 !important;
+}
+
+.st-key-result-metric-card-variables [data-testid="stMetricValue"] {
+    color: #6D3BC4 !important;
+}
+
+.st-key-result-metric-card-calidad [data-testid="stMetricLabel"] {
+    color: #8A435F !important;
+}
+
+.st-key-result-metric-card-calidad [data-testid="stMetricValue"] {
+    color: #A33A66 !important;
+}
+
+.st-key-result-metric-card-distancia [data-testid="stMetricLabel"] {
+    color: #8D5B12 !important;
+}
+
+.st-key-result-metric-card-distancia [data-testid="stMetricValue"] {
+    color: #B45309 !important;
+}
+
+@media (max-width: 640px) {
+    .st-key-result-metric-card-grupos,
+    .st-key-result-metric-card-registros,
+    .st-key-result-metric-card-variables,
+    .st-key-result-metric-card-calidad,
+    .st-key-result-metric-card-distancia {
+        min-height: 98px;
+    }
+}

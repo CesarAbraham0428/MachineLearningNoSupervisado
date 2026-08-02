@@ -1,1 +1,11 @@
 venv/
+
+__pycache__/
+
+# Skills locales del agente; se restauran mediante skills-lock.json
+.agents/skills/
+.claude/skills/
+
+# Modelos y catálogo generados durante el uso de la aplicación
+storage/models/*
+!storage/models/.gitkeep

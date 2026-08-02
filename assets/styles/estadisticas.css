@@ -1,0 +1,81 @@
+/*
+   ClusterLab — estadisticas.css
+   Estilos específicos de la pestaña "▥ Estadística descriptiva".
+   Agrega aquí los estilos de tablas de resumen, gráficas de distribución,
+   histogramas, heatmaps de correlación, etc., a medida que se implementen.
+*/
+
+/* ── Estilos específicos de la vista ─────────────────────────────────────── */
+/* Los estilos específicos de esta pestaña viven aquí para mantener aislada la UI. */
+
+/* Tarjetas de indicadores principales */
+.st-key-metric-card-registros,
+.st-key-metric-card-variables,
+.st-key-metric-card-respuestas,
+.st-key-metric-card-faltantes {
+    min-height: 112px;
+    padding: 8px 12px 6px;
+    border-radius: 14px !important;
+}
+
+.st-key-metric-card-registros {
+    background: #F1F4FF !important;
+    border-color: #CDD6FF !important;
+}
+
+.st-key-metric-card-variables {
+    background: #F6F1FF !important;
+    border-color: #E1D4FF !important;
+}
+
+.st-key-metric-card-respuestas {
+    background: #EFFBF8 !important;
+    border-color: #C5EEE5 !important;
+}
+
+.st-key-metric-card-faltantes {
+    background: #FFF8E8 !important;
+    border-color: #F6DFB1 !important;
+}
+
+.st-key-metric-card-registros [data-testid="stMetric"],
+.st-key-metric-card-variables [data-testid="stMetric"],
+.st-key-metric-card-respuestas [data-testid="stMetric"],
+.st-key-metric-card-faltantes [data-testid="stMetric"] {
+    min-height: 90px;
+    padding: 4px 2px;
+    background: transparent !important;
+}
+
+.st-key-metric-card-registros [data-testid="stMetricLabel"],
+.st-key-metric-card-variables [data-testid="stMetricLabel"],
+.st-key-metric-card-respuestas [data-testid="stMetricLabel"],
+.st-key-metric-card-faltantes [data-testid="stMetricLabel"] {
+    color: var(--cl-muted) !important;
+    font-weight: 600;
+}
+
+.st-key-metric-card-registros [data-testid="stMetricValue"] {
+    color: #365BD8 !important;
+}
+
+.st-key-metric-card-variables [data-testid="stMetricValue"] {
+    color: #6D3BC4 !important;
+}
+
+.st-key-metric-card-respuestas [data-testid="stMetricValue"] {
+    color: #0F766E !important;
+}
+
+.st-key-metric-card-faltantes [data-testid="stMetricValue"] {
+    color: #B45309 !important;
+}
+
+@media (max-width: 640px) {
+    .st-key-metric-card-registros,
+    .st-key-metric-card-variables,
+    .st-key-metric-card-respuestas,
+    .st-key-metric-card-faltantes {
+        min-height: 98px;
+    }
+}

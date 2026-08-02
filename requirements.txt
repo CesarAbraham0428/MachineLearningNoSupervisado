@@ -9,4 +9,5 @@ plotly
 matplotlib
 openpyxl
 fpdf2
+reportlab
 pytest
