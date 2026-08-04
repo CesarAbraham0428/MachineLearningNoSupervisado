@@ -3,10 +3,15 @@
 import io
 from datetime import date, datetime
 from html import escape
+from pathlib import Path
 
 import pandas as pd
 import streamlit as st
 
+from services.synthetic_data_service import (
+    ErrorDatosSinteticos,
+    generar_dataset_sintetico,
+)
 
 
 _SIN_FILTRO = "Sin filtro"
@@ -117,6 +122,8 @@ def _inicializar_estado() -> None:
         "firma_likert": None,
         "columnas_likert": [],
         "rango_fechas_filtro": None,
+        "datos_sinteticos_generados": None,
+        "datos_combinados_sinteticos": None,
     }
     for clave, valor in valores_iniciales.items():
         if clave not in st.session_state:
@@ -146,6 +153,13 @@ def _limpiar_estado_dataset() -> None:
     st.session_state.firma_likert = None
     st.session_state.columnas_likert = []
     st.session_state.rango_fechas_filtro = None
+    _limpiar_resultado_sintetico()
+
+
+def _limpiar_resultado_sintetico() -> None:
+    """Descarta el resultado temporal sin alterar el dataset cargado."""
+    st.session_state.datos_sinteticos_generados = None
+    st.session_state.datos_combinados_sinteticos = None
 
 
 def _detectar_columnas_categoricas(df: pd.DataFrame) -> list[str]:
@@ -313,6 +327,7 @@ def _renderizar_carga() -> None:
         st.session_state.resultado_limpieza = None
         st.session_state.dataset_limpio = None
         st.session_state.rango_fechas_filtro = None
+        _limpiar_resultado_sintetico()
         st.session_state["sel_columna_filtro"] = _SIN_FILTRO
         st.session_state["sel_valor_filtro"] = _TODOS
         st.toast("Dataset cargado correctamente")
@@ -323,9 +338,12 @@ def _renderizar_tabla_paginada(df: pd.DataFrame) -> None:
     """Renderiza la tabla nativa con paginación compacta."""
     col_info, col_paginas = st.columns([3, 1], vertical_alignment="bottom")
     with col_paginas:
+        opciones_filas = [100, 500, 1000, 2000]
+        if st.session_state.get("filas_pagina") not in opciones_filas:
+            st.session_state["filas_pagina"] = opciones_filas[0]
         filas_por_pagina = st.selectbox(
             "Filas por página",
-            options=[10, 25, 50, 100],
+            options=opciones_filas,
             index=0,
             key="filas_pagina",
         )
@@ -416,6 +434,113 @@ def _renderizar_paginacion(pagina_actual: int, total_paginas: int) -> None:
         ):
             st.session_state.pagina_actual = total_paginas
             st.rerun()
+
+
+def _nombre_descarga_sinteticos(nombre_archivo: object, mime: str) -> str:
+    """Construye un nombre de descarga claro sin depender del formato de entrada."""
+    nombre = Path(str(nombre_archivo or "dataset")).stem or "dataset"
+    extension = ".csv" if mime == "text/csv" else ".xlsx"
+    return f"{nombre}_sinteticos_y_original{extension}"
+
+
+def _renderizar_generador_sinteticos(datos_originales: pd.DataFrame) -> None:
+    """Muestra la generación, descarga y borrado del resultado sintético."""
+    with st.container(border=True, key="synthetic-data-panel"):
+        st.subheader("Generar datos sintéticos")
+        st.caption(
+            "Crea nuevas respuestas para las 25 preguntas Likert Big Five y "
+            "combínalas antes del dataset original."
+        )
+
+        columna_cantidad, columna_accion = st.columns(
+            [2, 1], vertical_alignment="bottom"
+        )
+        with columna_cantidad:
+            cantidad = st.number_input(
+                "Nuevos registros a generar",
+                min_value=1,
+                max_value=10_000,
+                value=100,
+                step=1,
+                key="cantidad_registros_sinteticos",
+                help="El resultado final contendrá esta cantidad más los registros originales.",
+            )
+        with columna_accion:
+            generar = st.button(
+                "Generar registros",
+                key="btn_generar_datos_sinteticos",
+                type="primary",
+                width="stretch",
+                icon=":material/auto_awesome:",
+            )
+
+        if generar:
+            try:
+                with st.spinner("Generando respuestas sintéticas…"):
+                    resultado = generar_dataset_sintetico(
+                        datos_originales,
+                        cantidad=int(cantidad),
+                    )
+            except (ErrorDatosSinteticos, TypeError, ValueError) as error:
+                st.error(
+                    "No se pudieron generar los registros: " + str(error),
+                    icon=":material/error:",
+                )
+            else:
+                st.session_state.datos_sinteticos_generados = (
+                    resultado.datos_sinteticos
+                )
+                st.session_state.datos_combinados_sinteticos = (
+                    resultado.datos_combinados
+                )
+                st.toast("Datos sintéticos generados correctamente")
+                st.rerun()
+
+        datos_sinteticos = st.session_state.get("datos_sinteticos_generados")
+        datos_combinados = st.session_state.get("datos_combinados_sinteticos")
+        if not isinstance(datos_sinteticos, pd.DataFrame) or not isinstance(
+            datos_combinados, pd.DataFrame
+        ):
+            return
+
+        total_originales = len(datos_originales)
+        total_sinteticos = len(datos_sinteticos)
+        metrica_originales, metrica_sinteticos, metrica_final = st.columns(3)
+        metrica_originales.metric("Originales", f"{total_originales:,}")
+        metrica_sinteticos.metric("Sintéticos", f"{total_sinteticos:,}")
+        metrica_final.metric("Archivo final", f"{len(datos_combinados):,}")
+
+        st.caption(
+            "Vista previa: las primeras filas son sintéticas y las restantes "
+            "corresponden al dataset original."
+        )
+        st.dataframe(datos_combinados.head(8), width="stretch", hide_index=True)
+
+        columna_descarga, columna_borrado = st.columns(2)
+        datos_descarga, _, mime_descarga = _preparar_descarga(datos_combinados)
+        with columna_descarga:
+            st.download_button(
+                "Exportar sintéticos + original",
+                data=datos_descarga,
+                file_name=_nombre_descarga_sinteticos(
+                    st.session_state.get("nombre_archivo"), mime_descarga
+                ),
+                mime=mime_descarga,
+                key="btn_exportar_datos_sinteticos",
+                width="stretch",
+                icon=":material/download:",
+            )
+        with columna_borrado:
+            if st.button(
+                "Borrar resultado sintético",
+                key="btn_borrar_datos_sinteticos",
+                type="secondary",
+                width="stretch",
+                icon=":material/delete:",
+            ):
+                _limpiar_resultado_sintetico()
+                st.toast("Resultado sintético eliminado")
+                st.rerun()
 
 
 
@@ -685,3 +810,6 @@ def renderizar_vista_datos() -> None:
             )
 
         _renderizar_tabla_paginada(df_filtrado)
+
+    st.divider()
+    _renderizar_generador_sinteticos(df_cargado)
