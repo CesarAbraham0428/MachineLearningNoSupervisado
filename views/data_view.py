@@ -136,6 +136,7 @@ def _inicializar_estado() -> None:
         "rango_fechas_filtro": None,
         "datos_sinteticos_generados": None,
         "datos_combinados_sinteticos": None,
+        "resumen_generacion_sintetica": None,
     }
     for clave, valor in valores_iniciales.items():
         if clave not in st.session_state:
@@ -192,6 +193,7 @@ def _limpiar_resultado_sintetico() -> None:
 
     st.session_state.datos_sinteticos_generados = None
     st.session_state.datos_combinados_sinteticos = None
+    st.session_state.resumen_generacion_sintetica = None
 
 
 def _invalidar_resultados_dataset() -> None:
@@ -573,12 +575,13 @@ def _nombre_descarga_sinteticos(nombre_archivo: object, mime: str) -> str:
 
 
 def _renderizar_generador_sinteticos(datos_originales: pd.DataFrame) -> None:
-    """Muestra la generación normal de perfiles Big Five y su activación."""
+    """Muestra la generacion basada en perfiles originales separados."""
     with st.container(border=True, key="synthetic-data-panel"):
         st.subheader("Generar perfiles Big Five sintéticos")
         st.caption(
-            "Para cada rasgo se calcula la media y desviación estándar de los "
-            "perfiles originales y se generan valores normales entre 1 y 5."
+            "Se seleccionan dos perfiles reales separados, se agrupan las respuestas "
+            "cercanas a cada uno y se generan nuevos perfiles alrededor de esos grupos. "
+            "Los registros originales no se modifican."
         )
 
         columna_cantidad, columna_accion = st.columns(
@@ -622,6 +625,9 @@ def _renderizar_generador_sinteticos(datos_originales: pd.DataFrame) -> None:
                 st.session_state.datos_combinados_sinteticos = (
                     resultado.datos_combinados
                 )
+                st.session_state.resumen_generacion_sintetica = (
+                    resultado.resumen_grupos
+                )
                 st.toast("Datos sintéticos generados correctamente")
                 st.rerun()
 
@@ -639,9 +645,17 @@ def _renderizar_generador_sinteticos(datos_originales: pd.DataFrame) -> None:
         metrica_sinteticos.metric("Sintéticos", f"{total_sinteticos:,}")
         metrica_final.metric("Archivo final", f"{len(datos_combinados):,}")
 
+        resumen_grupos = st.session_state.get("resumen_generacion_sintetica")
+        if isinstance(resumen_grupos, pd.DataFrame):
+            st.caption(
+                "Cada subconjunto se genera por separado para conservar perfiles "
+                "distintos dentro del set simulado."
+            )
+            st.dataframe(resumen_grupos, width="stretch", hide_index=True)
+
         st.caption(
-            "Vista previa: cada fila contiene solo los cinco rasgos. Las primeras "
-            "filas son sintéticas y las restantes corresponden a perfiles originales."
+            "Vista previa: la columna Origen distingue las filas sintéticas de "
+            "las respuestas originales; no se agrega carrera, grupo ni otra etiqueta."
         )
         st.dataframe(datos_combinados.head(8), width="stretch", hide_index=True)
 
@@ -723,8 +737,6 @@ def _renderizar_generador_sinteticos(datos_originales: pd.DataFrame) -> None:
                 _limpiar_resultado_sintetico()
                 st.toast("Resultado sintético eliminado")
                 st.rerun()
-
-
 
 def renderizar_vista_datos() -> None:
     """Renderiza la interfaz de datos (carga, filtros, exportación y tabla)."""
