@@ -246,8 +246,8 @@ class ServicioReportes:
         indicadores = [
             ("REGISTROS", str(resumen.cantidad_registros), cls._AZUL),
             ("VARIABLES", str(resumen.cantidad_variables), cls._VIOLETA),
-            ("RESPUESTAS", str(resumen.cantidad_registros * resumen.cantidad_variables), cls._VERDE),
-            ("FALTANTES", str(int(resumen.faltantes_por_pregunta.sum())), cls._AMBAR),
+            ("VALORES", str(resumen.cantidad_registros * resumen.cantidad_variables), cls._VERDE),
+            ("FALTANTES", str(int(resumen.faltantes_por_rasgo.sum())), cls._AMBAR),
         ]
         celdas = []
         for etiqueta, valor, color in indicadores:
@@ -277,25 +277,22 @@ class ServicioReportes:
     @staticmethod
     def _interpretacion(resumen: ResumenEstadistico) -> str:
         """Produce una interpretación breve, descriptiva y no clínica."""
-        frecuencias = resumen.frecuencia_respuestas
-        respuesta_predominante = frecuencias.loc[frecuencias["Frecuencia"].idxmax(), "Respuesta"]
         dimension_mayor = resumen.promedio_dimensiones.idxmax()
         valor_mayor = resumen.promedio_dimensiones.max()
         dimension_menor = resumen.promedio_dimensiones.idxmin()
         valor_menor = resumen.promedio_dimensiones.min()
-        faltantes = int(resumen.faltantes_por_pregunta.sum())
+        faltantes = int(resumen.faltantes_por_rasgo.sum())
 
         definiciones = {
             "Extraversión": "la sociabilidad, la energía en interacciones y la iniciativa para relacionarse con otras personas",
             "Estabilidad emocional": "la calma, la regulación emocional y la recuperación ante situaciones de presión",
-            "Apertura": "la curiosidad, el interés por aprender y la disposición hacia ideas o experiencias nuevas",
+            "Apertura a la experiencia": "la curiosidad, el interés por aprender y la disposición hacia ideas o experiencias nuevas",
             "Responsabilidad": "la planificación, el orden y el cumplimiento de tareas o compromisos",
             "Amabilidad": "la cooperación, la empatía y la consideración hacia otras personas",
         }
         texto = (
             f"El análisis reúne {resumen.cantidad_registros} registros y "
-            f"{resumen.cantidad_variables} variables del cuestionario. La respuesta "
-            f"más frecuente fue <b>{escape(str(respuesta_predominante))}</b>. "
+            f"{resumen.cantidad_variables} rasgos Big Five. "
             f"El promedio más alto fue <b>{escape(str(dimension_mayor))}</b> "
             f"({valor_mayor:.2f}/5); en este cuestionario, esta dimensión representa "
             f"{definiciones[dimension_mayor]}. "
@@ -314,11 +311,11 @@ class ServicioReportes:
     def _tabla_resumen(
         resumen: ResumenEstadistico, estilos: dict[str, ParagraphStyle]
     ) -> Table:
-        encabezados = ["Pregunta", "Media", "Mediana", "Moda", "Desv. est.", "Mín.", "Máx."]
+        encabezados = ["Rasgo", "Media", "Mediana", "Moda", "Desv. est.", "Mín.", "Máx."]
         filas = [
             [Paragraph(encabezado, estilos["tabla_encabezado"]) for encabezado in encabezados]
         ]
-        for pregunta, valores in resumen.estadisticas_por_pregunta.iterrows():
+        for pregunta, valores in resumen.estadisticas_por_rasgo.iterrows():
             filas.append(
                 [
                     Paragraph(escape(str(pregunta)), estilos["tabla"]),
@@ -326,8 +323,8 @@ class ServicioReportes:
                     f"{valores['Mediana']:.2f}",
                     f"{valores['Moda']:.2f}",
                     f"{valores['Desviación estándar']:.2f}",
-                    f"{valores['Mínimo']:.0f}",
-                    f"{valores['Máximo']:.0f}",
+                    f"{valores['Mínimo']:.2f}",
+                    f"{valores['Máximo']:.2f}",
                 ]
             )
 
@@ -402,8 +399,8 @@ class ServicioReportes:
             ["Fecha de generación", fecha.strftime("%d/%m/%Y %H:%M")],
             ["Registros analizados", str(resumen.cantidad_registros)],
             ["Variables analizadas", str(resumen.cantidad_variables)],
-            ["Respuestas evaluadas", str(resumen.cantidad_registros * resumen.cantidad_variables)],
-            ["Datos faltantes", str(int(resumen.faltantes_por_pregunta.sum()))],
+            ["Valores de rasgo evaluados", str(resumen.cantidad_registros * resumen.cantidad_variables)],
+            ["Datos faltantes", str(int(resumen.faltantes_por_rasgo.sum()))],
         ]
         tabla_metadatos = Table(metadatos, colWidths=[1.55 * inch, 5.3 * inch])
         tabla_metadatos.setStyle(
@@ -434,27 +431,16 @@ class ServicioReportes:
                 PageBreak(),
                 Paragraph("Resumen gráfico", estilos["seccion"]),
                 Paragraph(
-                    "Distribución global de respuestas y promedio observado en cada dimensión.",
+                    "Promedio observado en cada dimensión Big Five.",
                     estilos["cuerpo"],
                 ),
                 Spacer(1, 8),
             ]
         )
 
-        frecuencia = resumen.frecuencia_respuestas
         dimensiones = resumen.promedio_dimensiones
-        historia.append(
-            self._grafica_pastel(
-                "Distribución general de respuestas",
-                ["T. desacuerdo", "Desacuerdo", "Neutral", "De acuerdo", "T. acuerdo"],
-                frecuencia["Frecuencia"].astype(float).tolist(),
-                ancho=680,
-                alto=200,
-            )
-        )
         historia.extend(
             [
-                Spacer(1, 8),
                 self._grafica_barras(
                     "Promedio por dimensión Big Five",
                     dimensiones.index.tolist(),

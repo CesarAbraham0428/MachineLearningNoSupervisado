@@ -8,6 +8,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
+from services.dataset_service import ErrorDatos, crear_perfiles_big_five
 from services.synthetic_data_service import (
     ErrorDatosSinteticos,
     generar_dataset_sintetico,
@@ -102,6 +103,7 @@ def _inicializar_estado() -> None:
     """Garantiza que la vista pueda arrancar sin un dataset cargado."""
     valores_iniciales = {
         "dataframe_cargado": None,
+        "dataset_fuente_original": None,
         "dataset_original": None,
         "nombre_archivo_original": None,
         "fecha_carga_original": None,
@@ -136,6 +138,7 @@ def _inicializar_estado() -> None:
 def _limpiar_estado_dataset() -> None:
     """Elimina el dataset activo del estado y vuelve a habilitar la opción de carga."""
     st.session_state.dataframe_cargado = None
+    st.session_state.dataset_fuente_original = None
     st.session_state.dataset_original = None
     st.session_state.nombre_archivo_original = None
     st.session_state.fecha_carga_original = None
@@ -195,6 +198,8 @@ def _invalidar_resultados_dataset() -> None:
     st.session_state.columnas_likert = []
     st.session_state.modelo_entrenado = False
     st.session_state.resultado_entrenamiento = None
+    st.session_state.pop("evaluaciones_k", None)
+    st.session_state.pop("firma_evaluaciones_k", None)
     st.session_state.rango_fechas_filtro = None
     st.session_state.pop("variable_perfil_resultados", None)
 
@@ -375,8 +380,17 @@ def _renderizar_carga() -> None:
             st.error(error)
             return
 
-        st.session_state.dataframe_cargado = df_nuevo
-        st.session_state.dataset_original = df_nuevo
+        try:
+            perfiles_big_five = crear_perfiles_big_five(df_nuevo)
+        except (ErrorDatos, TypeError) as error:
+            st.error(
+                "El archivo no pudo transformarse a perfiles Big Five: " + str(error)
+            )
+            return
+
+        st.session_state.dataset_fuente_original = df_nuevo.copy(deep=True)
+        st.session_state.dataframe_cargado = perfiles_big_five.copy(deep=True)
+        st.session_state.dataset_original = perfiles_big_five.copy(deep=True)
         st.session_state.dataset_sintetico_activo = False
         # RF-08: al cargar un nuevo archivo se invalida la limpieza anterior
         st.session_state.dataset_limpio = None
@@ -405,7 +419,7 @@ def _renderizar_carga() -> None:
         _limpiar_resultado_sintetico()
         st.session_state["sel_columna_filtro"] = _SIN_FILTRO
         st.session_state["sel_valor_filtro"] = _TODOS
-        st.toast("Dataset cargado correctamente")
+        st.toast("Dataset convertido correctamente a cinco rasgos Big Five")
         st.rerun()
 
 
@@ -519,9 +533,13 @@ def _nombre_descarga_sinteticos(nombre_archivo: object, mime: str) -> str:
 
 
 def _renderizar_generador_sinteticos(datos_originales: pd.DataFrame) -> None:
-    """Muestra la generación, descarga y borrado del resultado sintético."""
+    """Muestra la generación normal de perfiles Big Five y su activación."""
     with st.container(border=True, key="synthetic-data-panel"):
-        st.subheader("Generar datos sintéticos")
+        st.subheader("Generar perfiles Big Five sintéticos")
+        st.caption(
+            "Para cada rasgo se calcula la media y desviación estándar de los "
+            "perfiles originales y se generan valores normales entre 1 y 5."
+        )
 
         columna_cantidad, columna_accion = st.columns(
             [2, 1], vertical_alignment="bottom"
@@ -547,7 +565,7 @@ def _renderizar_generador_sinteticos(datos_originales: pd.DataFrame) -> None:
 
         if generar:
             try:
-                with st.spinner("Generando respuestas sintéticas…"):
+                with st.spinner("Generando perfiles sintéticos…"):
                     resultado = generar_dataset_sintetico(
                         datos_originales,
                         cantidad=int(cantidad),
@@ -582,10 +600,20 @@ def _renderizar_generador_sinteticos(datos_originales: pd.DataFrame) -> None:
         metrica_final.metric("Archivo final", f"{len(datos_combinados):,}")
 
         st.caption(
-            "Vista previa: las primeras filas son sintéticas y las restantes "
-            "corresponden al dataset original."
+            "Vista previa: cada fila contiene solo los cinco rasgos. Las primeras "
+            "filas son sintéticas y las restantes corresponden a perfiles originales."
         )
         st.dataframe(datos_combinados.head(8), width="stretch", hide_index=True)
+
+        with st.expander("Ver parámetros estimados desde los originales"):
+            parametros = pd.DataFrame(
+                {
+                    "Media": datos_originales.mean(),
+                    "Desviación estándar": datos_originales.std(ddof=1),
+                }
+            ).round(3)
+            parametros.index.name = "Rasgo"
+            st.dataframe(parametros, width="stretch")
 
         (
             columna_descarga,
@@ -722,7 +750,10 @@ def renderizar_vista_datos() -> None:
         )
         with col_titulo:
             st.subheader("Conjunto de datos")
-            st.caption("Consulta y administra la información importada.")
+            st.caption(
+                "Cada registro representa una persona mediante sus cinco rasgos "
+                "Big Five calculados desde las 25 respuestas originales."
+            )
 
         with col_exportar:
             datos_descarga, nombre_descarga, mime_descarga = _preparar_descarga(df_para_exportar)

@@ -12,7 +12,9 @@ from services.dataset_service import (
     detectar_columnas_likert,
     diagnosticar_calidad,
     limpiar_dataset,
+    crear_perfiles_big_five,
     obtener_valor_likert,
+    validar_perfiles_big_five,
 )
 from utils.validators import validar_conjunto_datos
 
@@ -52,6 +54,28 @@ class PruebasServicioConjuntoDatos(unittest.TestCase):
             list(DIMENSIONES_BIG_FIVE),
         )
         self.assertTrue((resultado.dimensiones.iloc[0] == 4.0).all())
+
+    def test_promedia_cada_bloque_de_cinco_preguntas(self):
+        datos = _crear_dataset()
+        respuestas_por_bloque = [1, 2, 3, 4, 5]
+        for bloque, respuesta in enumerate(respuestas_por_bloque):
+            for numero in range(bloque * 5 + 1, bloque * 5 + 6):
+                datos[f"{numero}. Pregunta de prueba {numero}"] = respuesta
+
+        perfiles = crear_perfiles_big_five(datos)
+
+        self.assertEqual(perfiles.shape, (1, 5))
+        self.assertEqual(perfiles.iloc[0].tolist(), [1.0, 2.0, 3.0, 4.0, 5.0])
+
+    def test_valida_y_descarta_columnas_ajenas_de_perfiles(self):
+        perfiles = pd.DataFrame(
+            {dimension: [2.5, 3.5] for dimension in DIMENSIONES_BIG_FIVE}
+        )
+        perfiles["Identificador"] = [10, 11]
+
+        validados = validar_perfiles_big_five(perfiles)
+
+        self.assertEqual(validados.columns.tolist(), list(DIMENSIONES_BIG_FIVE))
 
     def test_acepta_variaciones_de_espacios_mayusculas_y_acentos(self):
         datos = _crear_dataset("  TOTALMENTE EN DESACUERDO  ")
