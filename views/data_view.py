@@ -103,6 +103,9 @@ def _inicializar_estado() -> None:
     valores_iniciales = {
         "dataframe_cargado": None,
         "dataset_original": None,
+        "nombre_archivo_original": None,
+        "fecha_carga_original": None,
+        "dataset_sintetico_activo": False,
         "dataset_limpio": None,
         "resultado_limpieza": None,
         "nombre_archivo": None,
@@ -134,6 +137,9 @@ def _limpiar_estado_dataset() -> None:
     """Elimina el dataset activo del estado y vuelve a habilitar la opción de carga."""
     st.session_state.dataframe_cargado = None
     st.session_state.dataset_original = None
+    st.session_state.nombre_archivo_original = None
+    st.session_state.fecha_carga_original = None
+    st.session_state.dataset_sintetico_activo = False
     st.session_state.dataset_limpio = None
     st.session_state.resultado_limpieza = None
     st.session_state.nombre_archivo = None
@@ -157,9 +163,75 @@ def _limpiar_estado_dataset() -> None:
 
 
 def _limpiar_resultado_sintetico() -> None:
-    """Descarta el resultado temporal sin alterar el dataset cargado."""
+    """Descarta el resultado y restaura el original si estaba activo el combinado."""
+    if st.session_state.get("dataset_sintetico_activo"):
+        dataset_original = st.session_state.get("dataset_original")
+        if isinstance(dataset_original, pd.DataFrame):
+            st.session_state.dataframe_cargado = dataset_original.copy(deep=True)
+        st.session_state.nombre_archivo = st.session_state.get(
+            "nombre_archivo_original"
+        )
+        st.session_state.fecha_carga = st.session_state.get("fecha_carga_original")
+        st.session_state.dataset_sintetico_activo = False
+        _invalidar_resultados_dataset()
+
     st.session_state.datos_sinteticos_generados = None
     st.session_state.datos_combinados_sinteticos = None
+
+
+def _invalidar_resultados_dataset() -> None:
+    """Limpia filtros y cálculos derivados al cambiar el dataset activo."""
+    st.session_state.dataset_limpio = None
+    st.session_state.resultado_limpieza = None
+    st.session_state.pagina_actual = 1
+    st.session_state.columnas_seleccionadas = []
+    st.session_state.dataframe_filtrado = None
+    st.session_state.filtro_calidad = None
+    st.session_state.dataframe_entrenamiento = None
+    st.session_state.firma_entrenamiento = None
+    st.session_state.dataset_likert = None
+    st.session_state.mapeo_likert = {}
+    st.session_state.firma_likert = None
+    st.session_state.columnas_likert = []
+    st.session_state.modelo_entrenado = False
+    st.session_state.resultado_entrenamiento = None
+    st.session_state.rango_fechas_filtro = None
+    st.session_state.pop("variable_perfil_resultados", None)
+
+
+def _activar_datos_combinados() -> None:
+    """Convierte el resultado sintético en el dataset que consumen las vistas."""
+    datos_combinados = st.session_state.get("datos_combinados_sinteticos")
+    if not isinstance(datos_combinados, pd.DataFrame):
+        return
+
+    st.session_state.dataframe_cargado = datos_combinados.copy(deep=True)
+    st.session_state.dataset_sintetico_activo = True
+    st.session_state.mostrar_carga = False
+    _invalidar_resultados_dataset()
+    st.session_state.nombre_archivo = _nombre_descarga_sinteticos(
+        st.session_state.get("nombre_archivo_original"),
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    st.session_state.fecha_carga = datetime.now().strftime("%d/%m/%Y %H:%M")
+
+
+def _restaurar_datos_originales() -> None:
+    """Vuelve a usar el original y conserva el combinado para reutilizarlo."""
+    if not st.session_state.get("dataset_sintetico_activo"):
+        return
+
+    datos_originales = st.session_state.get("dataset_original")
+    if not isinstance(datos_originales, pd.DataFrame):
+        return
+
+    st.session_state.dataframe_cargado = datos_originales.copy(deep=True)
+    st.session_state.dataset_sintetico_activo = False
+    st.session_state.nombre_archivo = st.session_state.get(
+        "nombre_archivo_original"
+    )
+    st.session_state.fecha_carga = st.session_state.get("fecha_carga_original")
+    _invalidar_resultados_dataset()
 
 
 def _detectar_columnas_categoricas(df: pd.DataFrame) -> list[str]:
@@ -305,11 +377,14 @@ def _renderizar_carga() -> None:
 
         st.session_state.dataframe_cargado = df_nuevo
         st.session_state.dataset_original = df_nuevo
+        st.session_state.dataset_sintetico_activo = False
         # RF-08: al cargar un nuevo archivo se invalida la limpieza anterior
         st.session_state.dataset_limpio = None
         st.session_state.resultado_limpieza = None
         st.session_state.nombre_archivo = archivo.name
+        st.session_state.nombre_archivo_original = archivo.name
         st.session_state.fecha_carga = datetime.now().strftime("%d/%m/%Y %H:%M")
+        st.session_state.fecha_carga_original = st.session_state.fecha_carga
         st.session_state.pagina_actual = 1
         st.session_state.mostrar_carga = False
         st.session_state.modelo_entrenado = False
@@ -447,10 +522,6 @@ def _renderizar_generador_sinteticos(datos_originales: pd.DataFrame) -> None:
     """Muestra la generación, descarga y borrado del resultado sintético."""
     with st.container(border=True, key="synthetic-data-panel"):
         st.subheader("Generar datos sintéticos")
-        st.caption(
-            "Crea nuevas respuestas para las 25 preguntas Likert Big Five y "
-            "combínalas antes del dataset original."
-        )
 
         columna_cantidad, columna_accion = st.columns(
             [2, 1], vertical_alignment="bottom"
@@ -516,20 +587,63 @@ def _renderizar_generador_sinteticos(datos_originales: pd.DataFrame) -> None:
         )
         st.dataframe(datos_combinados.head(8), width="stretch", hide_index=True)
 
-        columna_descarga, columna_borrado = st.columns(2)
+        (
+            columna_descarga,
+            columna_activar,
+            columna_restaurar,
+            columna_borrado,
+        ) = st.columns(4)
         datos_descarga, _, mime_descarga = _preparar_descarga(datos_combinados)
         with columna_descarga:
             st.download_button(
                 "Exportar sintéticos + original",
                 data=datos_descarga,
                 file_name=_nombre_descarga_sinteticos(
-                    st.session_state.get("nombre_archivo"), mime_descarga
+                    st.session_state.get("nombre_archivo_original")
+                    or st.session_state.get("nombre_archivo"),
+                    mime_descarga,
                 ),
                 mime=mime_descarga,
                 key="btn_exportar_datos_sinteticos",
                 width="stretch",
                 icon=":material/download:",
             )
+        with columna_activar:
+            datos_activos = st.session_state.get("dataset_sintetico_activo", False)
+            if st.button(
+                "Set de datos activo"
+                if datos_activos
+                else "Usar como set de datos",
+                key="btn_usar_datos_sinteticos",
+                type="primary" if not datos_activos else "secondary",
+                disabled=datos_activos,
+                width="stretch",
+                help=(
+                    "Usa el resultado combinado para la tabla, los filtros y "
+                    "la estadística descriptiva."
+                ),
+                icon=":material/dataset:",
+            ):
+                _activar_datos_combinados()
+                st.toast("Set de datos combinado activado")
+                st.rerun()
+        with columna_restaurar:
+            datos_activos = st.session_state.get("dataset_sintetico_activo", False)
+            if st.button(
+                "Restaurar original",
+                key="btn_restaurar_datos_originales",
+                type="secondary",
+                disabled=not datos_activos,
+                width="stretch",
+                help=(
+                    "Vuelve a usar el dataset original en la tabla, los filtros "
+                    "y la estadística descriptiva."
+                ),
+                icon=":material/restore:",
+            ):
+                _restaurar_datos_originales()
+                st.toast("Dataset original restaurado")
+                st.rerun()
         with columna_borrado:
             if st.button(
                 "Borrar resultado sintético",
@@ -636,7 +750,10 @@ def renderizar_vista_datos() -> None:
                 key="btn_borrar_dataset",
                 type="secondary",
                 width="stretch",
-                help="Elimina el conjunto de datos activo y vuelve a mostrar el apartado de carga",
+                help=(
+                    "Elimina de memoria el original, el combinado y cualquier "
+                    "resultado sintético; después vuelve a mostrar la carga."
+                ),
                 icon=":material/delete:",
             ):
                 _limpiar_estado_dataset()
@@ -812,4 +929,7 @@ def renderizar_vista_datos() -> None:
         _renderizar_tabla_paginada(df_filtrado)
 
     st.divider()
-    _renderizar_generador_sinteticos(df_cargado)
+    datos_originales = st.session_state.get("dataset_original")
+    if not isinstance(datos_originales, pd.DataFrame):
+        datos_originales = df_cargado
+    _renderizar_generador_sinteticos(datos_originales)
