@@ -307,7 +307,15 @@ def renderizar_vista_resultados() -> None:
         resumen = servicio.crear_resumen_grupos(resultado)
         proyeccion = servicio.crear_proyeccion_pca(resultado)
         centros = servicio.crear_tabla_centros(resultado)
-        asignaciones = servicio.crear_tabla_asignaciones(resultado)
+        datos_originales = st.session_state.get("dataframe_cargado")
+        asignaciones = servicio.crear_tabla_asignaciones(
+            resultado,
+            datos_originales=(
+                datos_originales
+                if isinstance(datos_originales, pd.DataFrame)
+                else None
+            ),
+        )
     except ErrorResultados as error:
         st.error(str(error))
         return
@@ -366,9 +374,24 @@ def renderizar_vista_resultados() -> None:
 
     with st.expander("Ver asignación de cada registro"):
         st.caption(
-            "Permite identificar a qué grupo fue asignado cada registro analizado."
+            "Cada fila conserva su identificador y los valores mostrados en "
+            "Datos cargados, junto con el grupo asignado por K-Means."
         )
-        st.dataframe(asignaciones, hide_index=True, width="stretch")
+        st.dataframe(
+            asignaciones,
+            hide_index=True,
+            width="stretch",
+            column_config={
+                "Identificador": st.column_config.TextColumn(
+                    pinned=True,
+                    help="Número de la fila correspondiente en los datos cargados.",
+                ),
+                "Grupo asignado": st.column_config.TextColumn(
+                    pinned=True,
+                    help="Grupo encontrado por el algoritmo K-Means.",
+                ),
+            },
+        )
 
     with st.expander("Ver centros completos de los grupos"):
         st.caption(
