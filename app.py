@@ -39,6 +39,7 @@ def _cargar_estilos() -> None:
         "entrenamiento.css",
         "resultados.css",
         "modelos.css",
+        "profesional.css",
     ]
     
     css_completo = []
@@ -80,6 +81,28 @@ def _renderizar_navegacion() -> int:
     return indice_nuevo
 
 
+def _renderizar_encabezado() -> None:
+    """Muestra una cabecera sobria que identifica la aplicacion."""
+    st.markdown(
+        """
+        <header class="cl-app-header">
+            <div>
+                <p class="cl-app-kicker">ANALISIS Y AGRUPAMIENTO DE DATOS</p>
+                <h1>ClusterLab</h1>
+                <p class="cl-app-subtitle">
+                    Espacio de trabajo para explorar datos y entrenar modelos no supervisados.
+                </p>
+            </div>
+            <div class="cl-app-status">
+                <span class="cl-app-status-dot"></span>
+                Flujo de analisis
+            </div>
+        </header>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def _renderizar_estado_vacio(titulo: str, descripcion: str, icono: str) -> None:
     """Muestra un estado de sección consistente, sin placeholders genéricos."""
     with st.container(border=True, key=f"empty-state-{icono}"):
@@ -99,6 +122,7 @@ def main() -> None:
 
     _cargar_estilos()
 
+    _renderizar_encabezado()
     tab_activa = _renderizar_navegacion()
 
     if tab_activa == 0:
