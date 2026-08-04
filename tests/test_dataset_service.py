@@ -13,6 +13,7 @@ from services.dataset_service import (
     diagnosticar_calidad,
     limpiar_dataset,
     crear_perfiles_big_five,
+    crear_perfiles_con_contexto,
     obtener_valor_likert,
     validar_perfiles_big_five,
 )
@@ -76,6 +77,17 @@ class PruebasServicioConjuntoDatos(unittest.TestCase):
         validados = validar_perfiles_big_five(perfiles)
 
         self.assertEqual(validados.columns.tolist(), list(DIMENSIONES_BIG_FIVE))
+
+    def test_conserva_contexto_para_filtrar_sin_conservar_preguntas(self):
+        datos = _crear_dataset()
+        datos["Grupo"] = ["A"]
+
+        perfiles = crear_perfiles_con_contexto(datos)
+
+        self.assertEqual(perfiles.columns[:5].tolist(), list(DIMENSIONES_BIG_FIVE))
+        self.assertIn("Marca temporal", perfiles.columns)
+        self.assertIn("Grupo", perfiles.columns)
+        self.assertFalse(any(str(columna).startswith("1.") for columna in perfiles.columns))
 
     def test_acepta_variaciones_de_espacios_mayusculas_y_acentos(self):
         datos = _crear_dataset("  TOTALMENTE EN DESACUERDO  ")

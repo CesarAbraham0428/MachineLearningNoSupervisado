@@ -8,7 +8,11 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from services.dataset_service import ErrorDatos, crear_perfiles_big_five
+from services.dataset_service import (
+    ErrorDatos,
+    crear_perfiles_big_five,
+    crear_perfiles_con_contexto,
+)
 from services.synthetic_data_service import (
     ErrorDatosSinteticos,
     generar_dataset_sintetico,
@@ -105,6 +109,7 @@ def _inicializar_estado() -> None:
         "dataframe_cargado": None,
         "dataset_fuente_original": None,
         "dataset_original": None,
+        "dataset_original_visualizacion": None,
         "nombre_archivo_original": None,
         "fecha_carga_original": None,
         "dataset_sintetico_activo": False,
@@ -119,6 +124,8 @@ def _inicializar_estado() -> None:
         "modelos_guardados": [],
         "columnas_seleccionadas": [],
         "dataframe_filtrado": None,
+        "indices_filas_filtradas": None,
+        "firma_filtro_activo": None,
         "filtro_calidad": None,
         "dataframe_entrenamiento": None,
         "firma_entrenamiento": None,
@@ -140,6 +147,7 @@ def _limpiar_estado_dataset() -> None:
     st.session_state.dataframe_cargado = None
     st.session_state.dataset_fuente_original = None
     st.session_state.dataset_original = None
+    st.session_state.dataset_original_visualizacion = None
     st.session_state.nombre_archivo_original = None
     st.session_state.fecha_carga_original = None
     st.session_state.dataset_sintetico_activo = False
@@ -154,6 +162,8 @@ def _limpiar_estado_dataset() -> None:
     st.session_state.pop("variable_perfil_resultados", None)
     st.session_state.columnas_seleccionadas = []
     st.session_state.dataframe_filtrado = None
+    st.session_state.indices_filas_filtradas = None
+    st.session_state.firma_filtro_activo = None
     st.session_state.filtro_calidad = None
     st.session_state.dataframe_entrenamiento = None
     st.session_state.firma_entrenamiento = None
@@ -168,7 +178,9 @@ def _limpiar_estado_dataset() -> None:
 def _limpiar_resultado_sintetico() -> None:
     """Descarta el resultado y restaura el original si estaba activo el combinado."""
     if st.session_state.get("dataset_sintetico_activo"):
-        dataset_original = st.session_state.get("dataset_original")
+        dataset_original = st.session_state.get("dataset_original_visualizacion")
+        if not isinstance(dataset_original, pd.DataFrame):
+            dataset_original = st.session_state.get("dataset_original")
         if isinstance(dataset_original, pd.DataFrame):
             st.session_state.dataframe_cargado = dataset_original.copy(deep=True)
         st.session_state.nombre_archivo = st.session_state.get(
@@ -189,6 +201,8 @@ def _invalidar_resultados_dataset() -> None:
     st.session_state.pagina_actual = 1
     st.session_state.columnas_seleccionadas = []
     st.session_state.dataframe_filtrado = None
+    st.session_state.indices_filas_filtradas = None
+    st.session_state.firma_filtro_activo = None
     st.session_state.filtro_calidad = None
     st.session_state.dataframe_entrenamiento = None
     st.session_state.firma_entrenamiento = None
@@ -201,6 +215,24 @@ def _invalidar_resultados_dataset() -> None:
     st.session_state.pop("evaluaciones_k", None)
     st.session_state.pop("firma_evaluaciones_k", None)
     st.session_state.rango_fechas_filtro = None
+    st.session_state.pop("variable_perfil_resultados", None)
+
+
+def _invalidar_resultados_filtro() -> None:
+    """Descarta resultados calculados con una selección de filas anterior."""
+    st.session_state.dataset_limpio = None
+    st.session_state.resultado_limpieza = None
+    st.session_state.filtro_calidad = None
+    st.session_state.dataframe_entrenamiento = None
+    st.session_state.firma_entrenamiento = None
+    st.session_state.dataset_likert = None
+    st.session_state.mapeo_likert = {}
+    st.session_state.firma_likert = None
+    st.session_state.columnas_likert = []
+    st.session_state.modelo_entrenado = False
+    st.session_state.resultado_entrenamiento = None
+    st.session_state.pop("evaluaciones_k", None)
+    st.session_state.pop("firma_evaluaciones_k", None)
     st.session_state.pop("variable_perfil_resultados", None)
 
 
@@ -226,7 +258,9 @@ def _restaurar_datos_originales() -> None:
     if not st.session_state.get("dataset_sintetico_activo"):
         return
 
-    datos_originales = st.session_state.get("dataset_original")
+    datos_originales = st.session_state.get("dataset_original_visualizacion")
+    if not isinstance(datos_originales, pd.DataFrame):
+        datos_originales = st.session_state.get("dataset_original")
     if not isinstance(datos_originales, pd.DataFrame):
         return
 
@@ -382,6 +416,7 @@ def _renderizar_carga() -> None:
 
         try:
             perfiles_big_five = crear_perfiles_big_five(df_nuevo)
+            perfiles_con_contexto = crear_perfiles_con_contexto(df_nuevo)
         except (ErrorDatos, TypeError) as error:
             st.error(
                 "El archivo no pudo transformarse a perfiles Big Five: " + str(error)
@@ -389,8 +424,11 @@ def _renderizar_carga() -> None:
             return
 
         st.session_state.dataset_fuente_original = df_nuevo.copy(deep=True)
-        st.session_state.dataframe_cargado = perfiles_big_five.copy(deep=True)
+        st.session_state.dataframe_cargado = perfiles_con_contexto.copy(deep=True)
         st.session_state.dataset_original = perfiles_big_five.copy(deep=True)
+        st.session_state.dataset_original_visualizacion = (
+            perfiles_con_contexto.copy(deep=True)
+        )
         st.session_state.dataset_sintetico_activo = False
         # RF-08: al cargar un nuevo archivo se invalida la limpieza anterior
         st.session_state.dataset_limpio = None
@@ -406,6 +444,8 @@ def _renderizar_carga() -> None:
         st.session_state.pop("variable_perfil_resultados", None)
         st.session_state.columnas_seleccionadas = []
         st.session_state.dataframe_filtrado = None
+        st.session_state.indices_filas_filtradas = None
+        st.session_state.firma_filtro_activo = None
         st.session_state.filtro_calidad = None
         st.session_state.dataframe_entrenamiento = None
         st.session_state.firma_entrenamiento = None
@@ -720,7 +760,7 @@ def renderizar_vista_datos() -> None:
     columnas_persistidas = [
         columna for columna in columnas_persistidas if columna in todas_columnas
     ]
-    columnas_persistidas_validas = len(columnas_persistidas) >= 2
+    columnas_persistidas_validas = len(columnas_persistidas) >= 1
     columnas_para_exportar = (
         columnas_persistidas if columnas_persistidas_validas else todas_columnas
     )
@@ -752,7 +792,8 @@ def renderizar_vista_datos() -> None:
             st.subheader("Conjunto de datos")
             st.caption(
                 "Cada registro representa una persona mediante sus cinco rasgos "
-                "Big Five calculados desde las 25 respuestas originales."
+                "Big Five. Las columnas de contexto se conservan únicamente para "
+                "filtrar filas y nunca se incorporan a K-Means."
             )
 
         with col_exportar:
@@ -793,13 +834,16 @@ def renderizar_vista_datos() -> None:
 
         # ── Selector de columnas ──────────────────────────────────────────
         columnas_elegidas = st.multiselect(
-            "Filtrar columnas a mostrar",
+            "Columnas visibles en la tabla",
             options=todas_columnas,
             default=seleccion_previa,
             format_func=_etiqueta_columna,
             placeholder="Selecciona al menos 2 columnas…",
             key="ms_columnas_filtro",
-            help="Elige las columnas que deseas visualizar. Se requieren mínimo 2 columnas para realizar clustering.",
+            help=(
+                "Este control solo cambia la tabla y la exportación. Los filtros "
+                "de filas sí se aplican a estadísticas y entrenamiento."
+            ),
         )
 
         col_filtro, col_valor = st.columns(2)
@@ -851,15 +895,7 @@ def renderizar_vista_datos() -> None:
                     persist_state="session",
                 )
 
-        # Validar mínimo 2 columnas para clustering
-        columnas_validas = len(columnas_elegidas) >= 2
-        if columnas_elegidas and not columnas_validas:
-            st.warning(
-                "⚠ Se requieren **mínimo 2 columnas** para que el algoritmo de "
-                "clustering (ML no supervisado) pueda generar al menos 2 grupos. "
-                "Selecciona al menos una columna adicional.",
-                icon=None,
-            )
+        columnas_validas = len(columnas_elegidas) >= 1
 
         # Persistir selección en session_state para el siguiente rerun
         if columnas_elegidas:
@@ -881,25 +917,12 @@ def renderizar_vista_datos() -> None:
             valor_filtro,
         )
 
-        # Un resultado de limpieza solo es válido para el subconjunto que lo
-        # originó. Si cambia cualquier filtro, se descarta para evitar mostrar
-        # métricas o un estado de calidad pertenecientes a otra selección.
-        if (
-            st.session_state.get("filtro_calidad") is not None
-            and st.session_state.get("filtro_calidad") != firma_filtro
-        ):
-            st.session_state.dataset_limpio = None
-            st.session_state.resultado_limpieza = None
-            st.session_state.filtro_calidad = None
-            st.session_state.dataframe_entrenamiento = None
-            st.session_state.firma_entrenamiento = None
-            st.session_state.dataset_likert = None
-            st.session_state.mapeo_likert = {}
-            st.session_state.firma_likert = None
-            st.session_state.columnas_likert = []
-            st.session_state.modelo_entrenado = False
-            st.session_state.resultado_entrenamiento = None
-            st.session_state.pop("variable_perfil_resultados", None)
+        # La firma del filtro se guarda siempre, aunque el dataset no haya
+        # requerido limpieza. Así todas las vistas comparten la misma selección.
+        firma_anterior = st.session_state.get("firma_filtro_activo")
+        if firma_anterior is not None and firma_anterior != firma_filtro:
+            _invalidar_resultados_filtro()
+        st.session_state.firma_filtro_activo = firma_filtro
         if (
             st.session_state.get("filtro_calidad") == firma_filtro
             and st.session_state.get("resultado_limpieza") is not None
@@ -907,6 +930,7 @@ def renderizar_vista_datos() -> None:
         ):
             df_filtrado = st.session_state.dataset_limpio.copy()
         st.session_state.dataframe_filtrado = df_filtrado.copy()
+        st.session_state.indices_filas_filtradas = df_filtrado.index.tolist()
 
         nombre_archivo = escape(str(st.session_state.nombre_archivo or "Dataset sin nombre"))
         fecha_carga = escape(str(st.session_state.fecha_carga or "Sin fecha"))

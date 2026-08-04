@@ -30,7 +30,7 @@ class PruebasServicioEstadisticas(unittest.TestCase):
         self.assertEqual(extraversion["Mínimo"], 2.0)
         self.assertEqual(extraversion["Máximo"], 4.0)
 
-    def test_calcula_promedios_faltantes_y_correlaciones(self):
+    def test_calcula_promedios_y_faltantes(self):
         perfiles = pd.DataFrame(
             {columna: [3.0, 3.0, 3.0] for columna in DIMENSIONES_BIG_FIVE}
         )
@@ -38,7 +38,6 @@ class PruebasServicioEstadisticas(unittest.TestCase):
 
         self.assertTrue((resumen.promedio_dimensiones == 3.0).all())
         self.assertEqual(int(resumen.faltantes_por_rasgo.sum()), 0)
-        self.assertEqual(resumen.correlaciones.shape, (5, 5))
 
 
 if __name__ == "__main__":

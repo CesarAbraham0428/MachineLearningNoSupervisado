@@ -318,7 +318,7 @@ def _renderizar_modelo_kmeans() -> None:
 
 def _obtener_datos_activos() -> pd.DataFrame | None:
     """Obtiene las cinco dimensiones y conserva cualquier filtro de filas."""
-    dataframe_filtrado = st.session_state.get("dataframe_filtrado")
+    indices_filtrados = st.session_state.get("indices_filas_filtradas")
     dataset_limpio = st.session_state.get("dataset_limpio")
     base = (
         dataset_limpio
@@ -327,8 +327,8 @@ def _obtener_datos_activos() -> pd.DataFrame | None:
     )
     if not isinstance(base, pd.DataFrame):
         return None
-    if isinstance(dataframe_filtrado, pd.DataFrame):
-        indices = base.index.intersection(dataframe_filtrado.index)
+    if indices_filtrados is not None:
+        indices = base.index.intersection(pd.Index(indices_filtrados))
         return base.loc[indices].copy()
     return base.copy()
 
@@ -723,6 +723,8 @@ def renderizar_vista_entrenamiento() -> None:
         "dataframe_cargado": None,
         "dataset_limpio": None,
         "dataframe_filtrado": None,
+        "indices_filas_filtradas": None,
+        "firma_filtro_activo": None,
         "resultado_limpieza": None,
         "filtro_calidad": None,
         "dataset_likert": None,
@@ -748,7 +750,7 @@ def renderizar_vista_entrenamiento() -> None:
         )
         return
 
-    firma_filtro = st.session_state.get("filtro_calidad")
+    firma_filtro = st.session_state.get("firma_filtro_activo")
     renderizar_validacion_limpieza(df_activo, firma_filtro=firma_filtro)
 
     firma_datos = _firma_datos_likert(df_activo, firma_filtro)

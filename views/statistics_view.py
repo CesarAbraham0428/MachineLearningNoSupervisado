@@ -15,13 +15,13 @@ from services.statistics_service import ResumenEstadistico, ServicioEstadisticas
 
 def _obtener_datos_activos() -> pd.DataFrame | None:
     """Obtiene las cinco dimensiones y conserva los filtros aplicados a filas."""
-    filtrado = st.session_state.get("dataframe_filtrado")
+    indices_filtrados = st.session_state.get("indices_filas_filtradas")
     limpio = st.session_state.get("dataset_limpio")
     base = limpio if isinstance(limpio, pd.DataFrame) else st.session_state.get("dataframe_cargado")
     if not isinstance(base, pd.DataFrame):
         return None
-    if isinstance(filtrado, pd.DataFrame):
-        indices = base.index.intersection(filtrado.index)
+    if indices_filtrados is not None:
+        indices = base.index.intersection(pd.Index(indices_filtrados))
         return base.loc[indices].copy()
     return base.copy()
 
@@ -44,25 +44,6 @@ def _grafica_promedios(resumen: ResumenEstadistico):
     )
 
 
-def _grafica_distribuciones(resumen: ResumenEstadistico):
-    datos = resumen.dimensiones_por_registro.melt(
-        var_name="Rasgo", value_name="Puntuación"
-    )
-    return px.box(
-        datos,
-        x="Rasgo",
-        y="Puntuación",
-        color="Rasgo",
-        points="outliers",
-        title="Dispersión de perfiles por rasgo",
-        color_discrete_sequence=["#43d78a", "#2388ff", "#b876ff", "#f39a32", "#f05d7a"],
-    ).update_layout(
-        showlegend=False,
-        yaxis=dict(range=[0.8, 5.2], dtick=1),
-        margin=dict(t=55, l=20, r=20, b=20),
-    )
-
-
 def _grafica_histograma(resumen: ResumenEstadistico, rasgo: str):
     datos = resumen.dimensiones_por_registro[[rasgo]].rename(columns={rasgo: "Valor"})
     return px.histogram(
@@ -79,19 +60,6 @@ def _grafica_histograma(resumen: ResumenEstadistico, rasgo: str):
         yaxis_rangemode="tozero",
         margin=dict(t=55, l=20, r=20, b=20),
     )
-
-
-def _grafica_correlaciones(resumen: ResumenEstadistico):
-    figura = px.imshow(
-        resumen.correlaciones,
-        text_auto=".2f",
-        zmin=-1,
-        zmax=1,
-        color_continuous_scale="RdBu_r",
-        title="Correlación entre rasgos",
-        labels={"color": "Correlación"},
-    )
-    return figura.update_layout(margin=dict(t=55, l=20, r=20, b=20))
 
 
 def _renderizar_tarjetas(resumen: ResumenEstadistico) -> None:
@@ -143,11 +111,7 @@ def renderizar_vista_estadisticas() -> None:
     st.subheader("Medidas estadísticas por rasgo")
     st.dataframe(resumen.estadisticas_por_rasgo, width="stretch")
 
-    izquierda, derecha = st.columns(2)
-    with izquierda:
-        st.plotly_chart(_grafica_promedios(resumen), width="stretch")
-    with derecha:
-        st.plotly_chart(_grafica_distribuciones(resumen), width="stretch")
+    st.plotly_chart(_grafica_promedios(resumen), width="stretch")
 
     st.subheader("Distribución por rasgo")
     rasgo = st.selectbox(
@@ -156,6 +120,3 @@ def renderizar_vista_estadisticas() -> None:
         key="rasgo_histograma",
     )
     st.plotly_chart(_grafica_histograma(resumen, rasgo), width="stretch")
-
-    with st.expander("Ver correlación entre rasgos", expanded=False):
-        st.plotly_chart(_grafica_correlaciones(resumen), width="stretch")

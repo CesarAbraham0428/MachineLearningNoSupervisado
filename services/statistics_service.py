@@ -19,7 +19,6 @@ class ResumenEstadistico:
     faltantes_por_rasgo: pd.Series
     promedio_dimensiones: pd.Series
     dimensiones_por_registro: pd.DataFrame
-    correlaciones: pd.DataFrame
 
 
 class ServicioEstadisticas:
@@ -60,5 +59,4 @@ class ServicioEstadisticas:
             faltantes_por_rasgo=faltantes,
             promedio_dimensiones=perfiles.mean().round(2),
             dimensiones_por_registro=perfiles,
-            correlaciones=perfiles.corr().round(3),
         )

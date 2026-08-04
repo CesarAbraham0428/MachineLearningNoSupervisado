@@ -378,6 +378,17 @@ def crear_perfiles_big_five(datos: pd.DataFrame) -> pd.DataFrame:
     return ServicioConjuntoDatos().preprocesar(datos).dimensiones.copy()
 
 
+def crear_perfiles_con_contexto(datos: pd.DataFrame) -> pd.DataFrame:
+    """Añade columnas auxiliares para filtrar sin incorporarlas a K-Means."""
+    preprocesado = ServicioConjuntoDatos().preprocesar(datos)
+    columnas_preguntas = set(preprocesado.columnas_preguntas)
+    columnas_contexto = [
+        columna for columna in datos.columns if columna not in columnas_preguntas
+    ]
+    contexto = datos.loc[:, columnas_contexto].copy()
+    return pd.concat([preprocesado.dimensiones.copy(), contexto], axis=1)
+
+
 def validar_perfiles_big_five(datos: pd.DataFrame) -> pd.DataFrame:
     """Valida y ordena un dataset que ya contiene los cinco rasgos Big Five."""
     if not isinstance(datos, pd.DataFrame):
