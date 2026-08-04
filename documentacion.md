@@ -70,6 +70,7 @@ venv\Scripts\activate
 streamlit run app.py
 ```
 
+
 La aplicación abre automáticamente en `http://localhost:8501`.
 
 ---

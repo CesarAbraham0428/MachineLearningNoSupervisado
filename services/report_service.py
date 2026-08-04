@@ -22,11 +22,17 @@ from reportlab.platypus import (
     TableStyle,
 )
 from reportlab.graphics.charts.barcharts import VerticalBarChart
+from reportlab.graphics.charts.lineplots import ScatterPlot
 from reportlab.graphics.charts.piecharts import Pie
 from reportlab.graphics.charts.textlabels import Label
 from reportlab.graphics.shapes import Drawing, String
+from reportlab.graphics.widgets.markers import makeMarker
 
+import pandas as pd
+
+from services.results_service import ProyeccionPCA, ServicioResultados
 from services.statistics_service import ResumenEstadistico
+from services.training_service import ResultadoEntrenamiento
 
 
 class ServicioReportes:
@@ -40,6 +46,17 @@ class ServicioReportes:
     _TINTA = colors.HexColor("#2B2622")
     _GRIS = colors.HexColor("#6E5C50")
     _FONDO_TABLA = colors.HexColor("#F4E8D9")
+
+    _PALETA_GRUPOS = [
+        colors.HexColor("#2388FF"),
+        colors.HexColor("#43D78A"),
+        colors.HexColor("#B06DF5"),
+        colors.HexColor("#F59E2F"),
+        colors.HexColor("#EF5576"),
+        colors.HexColor("#22B8CF"),
+        colors.HexColor("#F4C95D"),
+        colors.HexColor("#8B9A77"),
+    ]
 
     @staticmethod
     def _estilos() -> dict[str, ParagraphStyle]:
@@ -241,14 +258,8 @@ class ServicioReportes:
         return dibujo
 
     @classmethod
-    def _tarjetas_resumen(cls, resumen: ResumenEstadistico) -> Table:
-        """Presenta los indicadores clave como una cuadrícula compacta."""
-        indicadores = [
-            ("REGISTROS", str(resumen.cantidad_registros), cls._AZUL),
-            ("VARIABLES", str(resumen.cantidad_variables), cls._VIOLETA),
-            ("RESPUESTAS", str(resumen.cantidad_registros * resumen.cantidad_variables), cls._VERDE),
-            ("FALTANTES", str(int(resumen.faltantes_por_pregunta.sum())), cls._AMBAR),
-        ]
+    def _tarjetas(cls, indicadores: list[tuple[str, str, colors.Color]]) -> Table:
+        """Construye una cuadrícula compacta de tarjetas de indicadores clave."""
         celdas = []
         for etiqueta, valor, color in indicadores:
             celdas.append(
@@ -272,7 +283,30 @@ class ServicioReportes:
                     ),
                 )
             )
-        return Table([celdas], colWidths=[1.72 * inch] * 4, hAlign="LEFT")
+        return Table([celdas], colWidths=[1.72 * inch] * len(indicadores), hAlign="LEFT")
+
+    @classmethod
+    def _tarjetas_resumen(cls, resumen: ResumenEstadistico) -> Table:
+        """Presenta los indicadores clave del resumen estadístico."""
+        indicadores = [
+            ("REGISTROS", str(resumen.cantidad_registros), cls._AZUL),
+            ("VARIABLES", str(resumen.cantidad_variables), cls._VIOLETA),
+            ("RESPUESTAS", str(resumen.cantidad_registros * resumen.cantidad_variables), cls._VERDE),
+            ("FALTANTES", str(int(resumen.faltantes_por_pregunta.sum())), cls._AMBAR),
+        ]
+        return cls._tarjetas(indicadores)
+
+    @classmethod
+    def _tarjetas_entrenamiento(cls, resultado: ResultadoEntrenamiento) -> Table:
+        """Presenta los indicadores clave del entrenamiento K-Means."""
+        indicadores = [
+            ("GRUPOS", str(resultado.k_usado), cls._AZUL),
+            ("REGISTROS", str(len(resultado.asignaciones)), cls._VIOLETA),
+            ("VARIABLES", str(len(resultado.columnas)), cls._VERDE),
+            ("SILHOUETTE", f"{resultado.silhouette:.3f}", cls._AMBAR),
+            ("INERCIA", f"{resultado.inercia:,.1f}", cls._ROSA),
+        ]
+        return cls._tarjetas(indicadores)
 
     @staticmethod
     def _interpretacion(resumen: ResumenEstadistico) -> str:
@@ -351,6 +385,283 @@ class ServicioReportes:
             )
         )
         return tabla
+
+    @staticmethod
+    def _tabla_evaluacion_k(
+        resultado: ResultadoEntrenamiento, estilos: dict[str, ParagraphStyle]
+    ) -> Table:
+        """Compara la inercia y el Silhouette de cada valor de K evaluado."""
+        encabezados = ["K evaluado", "Inercia", "Silhouette", "Resultado"]
+        filas = [
+            [Paragraph(encabezado, estilos["tabla_encabezado"]) for encabezado in encabezados]
+        ]
+        for evaluacion in resultado.evaluaciones:
+            if evaluacion.k == resultado.k_usado:
+                resultado_texto = "Utilizado"
+            elif evaluacion.k == resultado.k_recomendado:
+                resultado_texto = "Recomendado"
+            else:
+                resultado_texto = ""
+            filas.append(
+                [
+                    str(evaluacion.k),
+                    f"{evaluacion.inercia:,.2f}",
+                    f"{evaluacion.silhouette:.3f}",
+                    resultado_texto,
+                ]
+            )
+        tabla = Table(
+            filas,
+            colWidths=[1.3 * inch, 1.7 * inch, 1.7 * inch, 1.7 * inch],
+            repeatRows=1,
+            hAlign="LEFT",
+        )
+        tabla.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), ServicioReportes._TINTA),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#D8C3A5")),
+                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, ServicioReportes._FONDO_TABLA]),
+                    ("ALIGN", (0, 1), (-1, -1), "CENTER"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 8.5),
+                    ("TOPPADDING", (0, 0), (-1, -1), 4),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                ]
+            )
+        )
+        return tabla
+
+    @staticmethod
+    def _tabla_grupos(
+        resumen_grupos: pd.DataFrame, estilos: dict[str, ParagraphStyle]
+    ) -> Table:
+        """Muestra la cantidad y el porcentaje de registros de cada grupo."""
+        encabezados = ["Grupo", "Registros", "Porcentaje"]
+        filas = [
+            [Paragraph(encabezado, estilos["tabla_encabezado"]) for encabezado in encabezados]
+        ]
+        for _, fila in resumen_grupos.iterrows():
+            filas.append(
+                [
+                    escape(str(fila["Grupo"])),
+                    str(int(fila["Registros"])),
+                    f"{float(fila['Porcentaje']) * 100:.1f}%",
+                ]
+            )
+        tabla = Table(
+            filas,
+            colWidths=[2.6 * inch, 2.2 * inch, 2.2 * inch],
+            repeatRows=1,
+            hAlign="LEFT",
+        )
+        tabla.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), ServicioReportes._TINTA),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#D8C3A5")),
+                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, ServicioReportes._FONDO_TABLA]),
+                    ("ALIGN", (0, 1), (-1, -1), "CENTER"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 8.5),
+                    ("TOPPADDING", (0, 0), (-1, -1), 4),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                ]
+            )
+        )
+        return tabla
+
+    @staticmethod
+    def _tabla_centros_entrenamiento(
+        centros: pd.DataFrame, estilos: dict[str, ParagraphStyle]
+    ) -> Table:
+        """Muestra los centros de cada grupo en la escala original de las variables.
+
+        Las variables se listan en filas y los grupos en columnas: los datasets
+        suelen tener muchas variables pero pocos grupos, así la tabla se
+        mantiene legible sin desbordar el ancho de la página, y puede
+        continuar en la siguiente página si no cabe completa.
+        """
+        grupos = centros["Grupo"].astype(str).tolist()
+        variables = [columna for columna in centros.columns if columna != "Grupo"]
+        valores_por_grupo = [
+            centros.loc[centros.index[indice]] for indice in range(len(centros))
+        ]
+
+        encabezados = ["Variable"] + grupos
+        filas = [
+            [Paragraph(escape(encabezado), estilos["tabla_encabezado"]) for encabezado in encabezados]
+        ]
+        for variable in variables:
+            valores_fila = [Paragraph(escape(str(variable)), estilos["tabla"])]
+            for fila_centro in valores_por_grupo:
+                valores_fila.append(f"{float(fila_centro[variable]):.2f}")
+            filas.append(valores_fila)
+
+        ancho_variable = 4.3 * inch
+        ancho_disponible = 9.0 * inch - ancho_variable
+        ancho_grupo = max(0.7 * inch, ancho_disponible / max(1, len(grupos)))
+        colWidths = [ancho_variable] + [ancho_grupo] * len(grupos)
+
+        tabla = Table(filas, colWidths=colWidths, repeatRows=1, hAlign="LEFT")
+        tabla.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), ServicioReportes._TINTA),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#D8C3A5")),
+                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, ServicioReportes._FONDO_TABLA]),
+                    ("ALIGN", (1, 1), (-1, -1), "CENTER"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 7.5),
+                    ("TOPPADDING", (0, 0), (-1, -1), 3),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+                ]
+            )
+        )
+        return tabla
+
+    @classmethod
+    def _grafica_dispersion(
+        cls, proyeccion: ProyeccionPCA, ancho: float = 680, alto: float = 260
+    ) -> Drawing:
+        """Representa los registros y los centros de grupo en un plano PCA."""
+        dibujo = Drawing(ancho, alto)
+        dibujo.add(
+            String(
+                0,
+                alto - 14,
+                "Mapa de similitud entre registros (proyección PCA)",
+                fontName="Helvetica-Bold",
+                fontSize=9.5,
+                fillColor=cls._TINTA,
+            )
+        )
+
+        grafico = ScatterPlot()
+        grafico.x = 55
+        grafico.y = 34
+        grafico.width = ancho - 90
+        grafico.height = alto - 74
+        grafico.lineLabelFormat = None
+        grafico.xLabel = ""
+        grafico.yLabel = ""
+
+        grupos_ordenados = sorted(
+            proyeccion.puntos["Grupo"].unique(),
+            key=lambda grupo: int(str(grupo).split()[-1]),
+        )
+        series = []
+        for grupo in grupos_ordenados:
+            subconjunto = proyeccion.puntos[proyeccion.puntos["Grupo"] == grupo]
+            series.append(
+                list(zip(subconjunto["Componente 1"], subconjunto["Componente 2"]))
+            )
+        series.append(
+            list(zip(proyeccion.centros["Componente 1"], proyeccion.centros["Componente 2"]))
+        )
+        grafico.data = series
+
+        for indice, _ in enumerate(grupos_ordenados):
+            color = cls._PALETA_GRUPOS[indice % len(cls._PALETA_GRUPOS)]
+            grafico.lines[indice].symbol = makeMarker("FilledCircle")
+            grafico.lines[indice].symbol.fillColor = color
+            grafico.lines[indice].symbol.strokeColor = None
+            grafico.lines[indice].symbol.size = 3.4
+
+        indice_centros = len(grupos_ordenados)
+        grafico.lines[indice_centros].symbol = makeMarker("FilledCross")
+        grafico.lines[indice_centros].symbol.fillColor = cls._TINTA
+        grafico.lines[indice_centros].symbol.strokeColor = cls._TINTA
+        grafico.lines[indice_centros].symbol.size = 8
+
+        grafico.xValueAxis.labels.fontName = "Helvetica"
+        grafico.xValueAxis.labels.fontSize = 6.5
+        grafico.yValueAxis.labels.fontName = "Helvetica"
+        grafico.yValueAxis.labels.fontSize = 6.5
+        grafico.xValueAxis.visibleGrid = True
+        grafico.yValueAxis.visibleGrid = True
+        grafico.xValueAxis.gridStrokeColor = colors.HexColor("#E7DCC9")
+        grafico.yValueAxis.gridStrokeColor = colors.HexColor("#E7DCC9")
+        grafico.xValueAxis.strokeColor = cls._GRIS
+        grafico.yValueAxis.strokeColor = cls._GRIS
+        dibujo.add(grafico)
+
+        varianza_1, varianza_2 = proyeccion.varianza_explicada
+        dibujo.add(
+            String(
+                grafico.x + grafico.width / 2,
+                4,
+                f"Componente 1 ({varianza_1:.1%} de varianza explicada)",
+                textAnchor="middle",
+                fontName="Helvetica",
+                fontSize=7,
+                fillColor=cls._GRIS,
+            )
+        )
+        etiqueta_y = Label()
+        etiqueta_y.x = grafico.x - 42
+        etiqueta_y.y = grafico.y + (grafico.height / 2)
+        etiqueta_y.setText(f"Componente 2 ({varianza_2:.1%})")
+        etiqueta_y.angle = 90
+        etiqueta_y.fontName = "Helvetica"
+        etiqueta_y.fontSize = 7
+        etiqueta_y.fillColor = cls._GRIS
+        etiqueta_y.boxAnchor = "c"
+        etiqueta_y.textAnchor = "middle"
+        dibujo.add(etiqueta_y)
+        return dibujo
+
+    @staticmethod
+    def _interpretacion_entrenamiento(
+        resultado: ResultadoEntrenamiento, resumen_grupos: pd.DataFrame
+    ) -> str:
+        """Produce una interpretación breve y no clínica de los resultados de K-Means."""
+        titulo_silhouette, explicacion_silhouette = ServicioResultados.interpretar_silhouette(
+            resultado.silhouette
+        )
+        fila_mayor = resumen_grupos.loc[resumen_grupos["Registros"].idxmax()]
+        fila_menor = resumen_grupos.loc[resumen_grupos["Registros"].idxmin()]
+
+        candidatos = [evaluacion.k for evaluacion in resultado.evaluaciones]
+        if candidatos:
+            rango_evaluado = (
+                str(candidatos[0])
+                if len(candidatos) == 1
+                else f"{candidatos[0]} a {candidatos[-1]}"
+            )
+            if resultado.k_usado == resultado.k_recomendado:
+                seleccion = (
+                    f"Se evaluaron valores de K entre {rango_evaluado} y se "
+                    f"seleccionaron {resultado.k_usado} grupos por obtener el mayor "
+                    "índice de Silhouette."
+                )
+            else:
+                seleccion = (
+                    f"Se evaluaron valores de K entre {rango_evaluado}; el valor con "
+                    f"mayor Silhouette fue {resultado.k_recomendado}, aunque el "
+                    f"entrenamiento final se realizó con {resultado.k_usado} grupos."
+                )
+        else:
+            seleccion = f"El modelo se entrenó con {resultado.k_usado} grupos."
+
+        texto = (
+            f"El modelo K-Means agrupó {len(resultado.asignaciones)} registros en "
+            f"{resultado.k_usado} grupos utilizando {len(resultado.columnas)} variables. "
+            f"{seleccion} El índice de Silhouette obtenido fue de "
+            f"<b>{resultado.silhouette:.3f}</b>, lo que indica una "
+            f"<b>{titulo_silhouette.lower()}</b>: {explicacion_silhouette.lower()} "
+            f"La inercia del modelo fue de {resultado.inercia:,.1f}; este valor resume "
+            "la distancia interna de los grupos y es menor cuanto más compactos son. "
+            f"El grupo con mayor cantidad de registros fue <b>{escape(str(fila_mayor['Grupo']))}</b> "
+            f"con {int(fila_mayor['Registros'])} registros "
+            f"({float(fila_mayor['Porcentaje']) * 100:.1f}%), mientras que "
+            f"<b>{escape(str(fila_menor['Grupo']))}</b> agrupó la menor cantidad, con "
+            f"{int(fila_menor['Registros'])} registros "
+            f"({float(fila_menor['Porcentaje']) * 100:.1f}%). "
+            "Estos resultados describen patrones estadísticos del conjunto analizado y "
+            "no constituyen una clasificación definitiva ni un diagnóstico individual."
+        )
+        return texto
 
     @staticmethod
     def _encabezado_pie(canvas, documento) -> None:
@@ -484,3 +795,148 @@ class ServicioReportes:
         destino.parent.mkdir(parents=True, exist_ok=True)
         destino.write_bytes(self.generar_reporte_estadistico(resultados, **opciones))
         return destino
+
+    def generar_reporte_entrenamiento(
+        self,
+        resultado: ResultadoEntrenamiento,
+        nombre_dataset: str = "Dataset sin nombre",
+        fecha_generacion: datetime | None = None,
+    ) -> bytes:
+        """Genera un PDF descargable con las gráficas, métricas e interpretación
+        de un entrenamiento de K-Means (RF de descarga de reporte de resultados)."""
+        if not isinstance(resultado, ResultadoEntrenamiento):
+            raise TypeError("El reporte requiere un resultado de entrenamiento válido.")
+
+        servicio_resultados = ServicioResultados()
+        resumen_grupos = servicio_resultados.crear_resumen_grupos(resultado)
+        proyeccion = servicio_resultados.crear_proyeccion_pca(resultado)
+        centros = servicio_resultados.crear_tabla_centros(resultado)
+
+        fecha = fecha_generacion or datetime.now()
+        estilos = self._estilos()
+        salida = BytesIO()
+        documento = SimpleDocTemplate(
+            salida,
+            pagesize=landscape(letter),
+            leftMargin=0.5 * inch,
+            rightMargin=0.5 * inch,
+            topMargin=0.62 * inch,
+            bottomMargin=0.56 * inch,
+            title="Reporte de resultados del entrenamiento - ClusterLab",
+            author="ClusterLab",
+        )
+
+        historia = [
+            Paragraph("INFORME ACADÉMICO / RESULTADOS DEL ENTRENAMIENTO", estilos["subtitulo"]),
+            Paragraph("Resultados del entrenamiento K-Means", estilos["titulo"]),
+            Paragraph(
+                "Métricas, grupos y proyección obtenidos tras entrenar el modelo de agrupamiento",
+                estilos["subtitulo"],
+            ),
+            HRFlowable(width="100%", thickness=1, color=self._AZUL, spaceAfter=12),
+        ]
+
+        etiqueta_k = f"{resultado.k_usado}"
+        if resultado.k_usado == resultado.k_recomendado:
+            etiqueta_k += " (recomendado)"
+        else:
+            etiqueta_k += f" (recomendado: {resultado.k_recomendado})"
+
+        metadatos = [
+            ["Dataset", escape(nombre_dataset)],
+            ["Fecha de generación", fecha.strftime("%d/%m/%Y %H:%M")],
+            ["Algoritmo", "K-Means"],
+            ["Grupos utilizados (K)", etiqueta_k],
+            ["Registros agrupados", str(len(resultado.asignaciones))],
+            ["Cantidad de variables", str(len(resultado.columnas))],
+        ]
+        tabla_metadatos = Table(metadatos, colWidths=[1.55 * inch, 5.3 * inch])
+        tabla_metadatos.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (0, -1), ServicioReportes._FONDO_TABLA),
+                    ("TEXTCOLOR", (0, 0), (0, -1), ServicioReportes._TINTA),
+                    ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+                    ("FONTNAME", (1, 0), (1, -1), "Helvetica"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 9),
+                    ("TEXTCOLOR", (1, 0), (1, -1), colors.HexColor("#3C332C")),
+                    ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#D8C3A5")),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("TOPPADDING", (0, 0), (-1, -1), 6),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                ]
+            )
+        )
+
+        historia.extend(
+            [
+                Paragraph("Resumen del entrenamiento", estilos["seccion"]),
+                self._tarjetas_entrenamiento(resultado),
+                Spacer(1, 12),
+                tabla_metadatos,
+                Paragraph("Interpretación de resultados", estilos["seccion"]),
+                Paragraph(
+                    self._interpretacion_entrenamiento(resultado, resumen_grupos),
+                    estilos["cuerpo"],
+                ),
+                PageBreak(),
+                Paragraph("Evaluación de valores de K", estilos["seccion"]),
+                Paragraph(
+                    "Comparación de inercia y Silhouette para cada valor de K evaluado "
+                    "antes de entrenar el modelo final.",
+                    estilos["cuerpo"],
+                ),
+                Spacer(1, 6),
+                self._tabla_evaluacion_k(resultado, estilos),
+                Spacer(1, 14),
+                Paragraph("Resumen de los grupos", estilos["seccion"]),
+                self._tabla_grupos(resumen_grupos, estilos),
+                PageBreak(),
+                Paragraph("Centros de los grupos (escala original)", estilos["seccion"]),
+                Paragraph(
+                    "Valor representativo de cada variable en el centro de cada grupo, "
+                    "expresado en la escala original de los datos.",
+                    estilos["cuerpo"],
+                ),
+                Spacer(1, 6),
+                self._tabla_centros_entrenamiento(centros, estilos),
+                PageBreak(),
+                Paragraph("Gráficas del entrenamiento", estilos["seccion"]),
+                Paragraph(
+                    "Tamaño de cada grupo y proyección en dos dimensiones de los "
+                    "registros agrupados.",
+                    estilos["cuerpo"],
+                ),
+                Spacer(1, 8),
+            ]
+        )
+
+        historia.append(
+            self._grafica_barras(
+                "Tamaño de los grupos",
+                resumen_grupos["Grupo"].tolist(),
+                resumen_grupos["Registros"].astype(float).tolist(),
+                self._AZUL,
+                "Registros",
+                ancho=680,
+                alto=200,
+                mostrar_valores=True,
+                etiqueta_eje_x="Grupo",
+            )
+        )
+        historia.extend(
+            [
+                Spacer(1, 10),
+                self._grafica_dispersion(proyeccion),
+                Spacer(1, 4),
+                Paragraph(
+                    "Cada color representa un grupo distinto; la marca en forma de "
+                    "cruz indica el centro de cada grupo. Esta proyección solo se usa "
+                    "para visualizar y no participó en el entrenamiento del modelo.",
+                    estilos["cuerpo"],
+                ),
+            ]
+        )
+
+        documento.build(historia, onFirstPage=self._encabezado_pie, onLaterPages=self._encabezado_pie)
+        return salida.getvalue()

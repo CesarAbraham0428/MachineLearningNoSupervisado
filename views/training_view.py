@@ -13,6 +13,7 @@ from services.training_service import (
     EvaluacionK,
     ServicioEntrenamiento,
 )
+from services.model_service import ErrorModelo, ModeloGuardado, ServicioModelo
 from services.dataset_service import (
     DiagnosticoCalidad,
     ETIQUETAS_LIKERT,
@@ -139,6 +140,142 @@ def _grafica_silhouette(tabla: pd.DataFrame):
     )
 
 
+def _opcion_modelo_compatible(modelo: ModeloGuardado) -> str:
+    """Etiqueta legible para elegir un modelo compatible en el selector."""
+    return (
+        f"{modelo.nombre} · {modelo.cantidad_grupos} grupos · "
+        f"Silhouette {modelo.silhouette:.3f} · "
+        f"{modelo.fecha_creacion.strftime('%d/%m/%Y')}"
+    )
+
+
+def _renderizar_reutilizacion_modelos(
+    datos_preparados: pd.DataFrame, columnas_numericas: list[str]
+) -> None:
+    """Identifica modelos guardados compatibles y permite reutilizarlos (RF).
+
+    Un modelo es compatible cuando todas las variables con las que fue
+    entrenado existen entre las columnas numéricas del dataset activo. El
+    usuario puede elegir uno y usarlo directamente (sin reentrenar) o
+    continuar su entrenamiento con los nuevos datos.
+    """
+    try:
+        modelos_compatibles = ServicioModelo().listar_modelos_compatibles(
+            columnas_numericas
+        )
+    except ErrorModelo as error:
+        st.warning(f"No fue posible revisar los modelos guardados: {error}")
+        return
+
+    if not modelos_compatibles:
+        return
+
+    with st.container(border=True, key="reuso-modelo-panel"):
+        st.subheader(":material/inventory_2: Reutilizar un modelo guardado")
+        st.caption(
+            f"Se encontraron {len(modelos_compatibles)} modelo(s) guardado(s) "
+            "compatibles con las variables numéricas de este dataset. "
+            "Reutilizarlos evita entrenar desde cero."
+        )
+
+        opciones = {
+            _opcion_modelo_compatible(modelo): modelo for modelo in modelos_compatibles
+        }
+        etiqueta_seleccion = st.selectbox(
+            "Modelo compatible",
+            options=list(opciones.keys()),
+            key="select_modelo_compatible",
+        )
+        modelo_seleccionado = opciones[etiqueta_seleccion]
+
+        with st.container(horizontal=True):
+            st.caption(
+                f":material/dataset: Dataset de origen: {modelo_seleccionado.dataset_origen}"
+            )
+            st.caption(
+                f":material/calendar_month: Entrenado el "
+                f"{modelo_seleccionado.fecha_creacion.strftime('%d/%m/%Y %H:%M')}"
+            )
+        st.caption(
+            "Variables del modelo: " + ", ".join(modelo_seleccionado.columnas)
+        )
+
+        columna_usar, columna_continuar = st.columns(2)
+        with columna_usar:
+            usar = st.button(
+                "Usar modelo sin reentrenar",
+                icon=":material/bolt:",
+                key="btn_usar_modelo_existente",
+                width="stretch",
+                help=(
+                    "Aplica el modelo guardado a este dataset tal cual está: "
+                    "solo asigna cada registro al grupo más cercano."
+                ),
+            )
+        with columna_continuar:
+            continuar = st.button(
+                "Continuar entrenamiento con este modelo",
+                icon=":material/play_arrow:",
+                key="btn_continuar_modelo_existente",
+                type="primary",
+                width="stretch",
+                help=(
+                    "Reentrena partiendo de los centros del modelo guardado en "
+                    "vez de una inicialización aleatoria."
+                ),
+            )
+
+        if not (usar or continuar):
+            return
+
+        servicio_modelo = ServicioModelo()
+        try:
+            artefacto = servicio_modelo.cargar_modelo(modelo_seleccionado.id)
+        except ErrorModelo as error:
+            st.error(str(error))
+            return
+
+        servicio = ServicioEntrenamiento()
+        try:
+            if usar:
+                resultado = servicio.reutilizar_modelo(
+                    datos_preparados,
+                    tuple(artefacto["columnas"]),
+                    artefacto["modelo"],
+                    artefacto["escalador"],
+                )
+                mensaje = (
+                    f'Se reutilizó "{modelo_seleccionado.nombre}" sin reentrenar. '
+                    f"Silhouette obtenido con los nuevos datos: {resultado.silhouette:.3f}."
+                )
+            else:
+                resultado = servicio.continuar_entrenamiento(
+                    datos_preparados,
+                    tuple(artefacto["columnas"]),
+                    artefacto["modelo"],
+                    artefacto["escalador"],
+                )
+                mensaje = (
+                    f'Se continuó el entrenamiento de "{modelo_seleccionado.nombre}" '
+                    f"con los nuevos datos. Silhouette obtenido: {resultado.silhouette:.3f}."
+                )
+        except ErrorEntrenamiento as error:
+            st.error(str(error))
+            return
+
+        st.session_state.pop("variable_perfil_resultados", None)
+        st.session_state["resultado_entrenamiento"] = resultado
+        st.session_state["modelo_entrenado"] = True
+        st.success(mensaje, icon=":material/check_circle:")
+        tamanos = resultado.tamanos_clusters.rename("Registros").to_frame()
+        tamanos.index.name = "Grupo"
+        st.dataframe(tamanos, width="stretch")
+        st.caption(
+            "Revisa los resultados completos en la pestaña **Resultados**, "
+            "donde también puedes guardar esta versión como un nuevo modelo."
+        )
+
+
 def _renderizar_modelo_kmeans() -> None:
     """Guía la selección de variables, recomendación de K y entrenamiento."""
     st.subheader("Configuración de K-Means")
@@ -170,6 +307,8 @@ def _renderizar_modelo_kmeans() -> None:
     if len(columnas_numericas) < 2:
         st.error("Se requieren al menos dos columnas numéricas para entrenar.")
         return
+
+    _renderizar_reutilizacion_modelos(datos_preparados, columnas_numericas)
 
     resumen_izquierda, resumen_centro, resumen_derecha = st.columns(3)
     resumen_izquierda.metric("Registros disponibles", len(datos_preparados))

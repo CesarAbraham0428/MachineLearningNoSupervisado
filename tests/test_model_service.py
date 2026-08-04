@@ -113,6 +113,34 @@ class PruebasServicioModelo(unittest.TestCase):
                 categoria=" ",
             )
 
+    def test_lista_solo_modelos_compatibles_con_las_columnas_disponibles(self):
+        self.servicio.guardar_modelo(
+            self.resultado,
+            nombre="Modelo compatible",
+            categoria="Personalidad",
+            dataset_origen="personalidad.csv",
+        )
+
+        compatibles = self.servicio.listar_modelos_compatibles(
+            ["Extraversión", "Responsabilidad", "Otra columna extra"]
+        )
+        self.assertEqual([modelo.nombre for modelo in compatibles], ["Modelo compatible"])
+
+        incompatibles = self.servicio.listar_modelos_compatibles(["Solo esta columna"])
+        self.assertEqual(incompatibles, [])
+
+    def test_columnas_del_modelo_quedan_disponibles_en_el_catalogo(self):
+        guardado = self.servicio.guardar_modelo(
+            self.resultado,
+            nombre="Modelo con columnas",
+            categoria="Personalidad",
+            dataset_origen="personalidad.csv",
+        )
+
+        self.assertEqual(guardado.columnas, tuple(self.resultado.columnas))
+        listado = self.servicio.listar_modelos()
+        self.assertEqual(listado[0].columnas, tuple(self.resultado.columnas))
+
 
 if __name__ == "__main__":
     unittest.main()

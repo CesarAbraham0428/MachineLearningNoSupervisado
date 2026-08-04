@@ -7,9 +7,184 @@
 
 /* ── Hero ───────────────────────────────────────────────────────────────────── */
 /* ── Botón de carga ─────────────────────────────────────────────────────────── */
-.st-key-btn_abrir_carga button {
-    min-width: 214px;
+.st-key-upload-panel {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    margin-bottom: 18px;
+    padding: 30px clamp(18px, 4vw, 56px) 34px;
+    border: 1px solid #C9C8F4 !important;
+    border-radius: 16px !important;
+    background:
+        radial-gradient(circle at 92% 8%, rgba(91, 91, 214, 0.15), transparent 28%),
+        linear-gradient(135deg, #F8F7FF 0%, #F2F4FF 62%, #ECFAF8 100%) !important;
+}
+
+.st-key-upload-panel::after {
+    position: absolute;
+    z-index: -1;
+    right: -58px;
+    bottom: -72px;
+    width: 190px;
+    height: 190px;
+    border: 1px solid rgba(13, 148, 136, 0.15);
+    border-radius: 50%;
+    content: "";
+}
+
+.st-key-upload-panel > div {
+    gap: 0.2rem;
+}
+
+.st-key-upload-panel [data-testid="stMarkdownContainer"] p {
+    margin: 0;
+}
+
+.st-key-upload-panel > div > div:first-child [data-testid="stMarkdownContainer"] p {
+    color: var(--cl-primary);
+    font-size: 3.25rem;
+    line-height: 1;
+}
+
+.st-key-upload-panel h3 {
+    margin: 10px 0 2px;
+    color: var(--cl-text) !important;
+    font-size: clamp(1.2rem, 2vw, 1.45rem);
+    letter-spacing: -0.02em;
+}
+
+.st-key-upload-panel [data-testid="stCaptionContainer"] {
+    margin-bottom: 20px;
+}
+
+.st-key-upload-panel [data-testid="stCaptionContainer"] p {
+    color: var(--cl-muted) !important;
+    font-size: 0.96rem !important;
+}
+
+.st-key-upload-panel [data-testid="stFileUploader"] {
+    margin: 0 auto;
+    max-width: 760px;
+    padding: 6px 8px 8px;
+    border: 1px solid rgba(99, 102, 241, 0.28) !important;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.72) !important;
+}
+
+.st-key-upload-panel [data-testid="stFileUploader"] label {
+    color: var(--cl-text) !important;
+    font-size: 0.98rem !important;
+    font-weight: 600 !important;
+}
+
+.st-key-upload-panel [data-testid="stFileUploaderDropzone"] {
+    min-height: 76px;
+    border: 1px dashed rgba(91, 91, 214, 0.45) !important;
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.55) !important;
+    transition: border-color 160ms ease, background 160ms ease;
+}
+
+.st-key-upload-panel [data-testid="stFileUploaderDropzone"]:hover {
+    border-color: var(--cl-primary) !important;
+    background: rgba(255, 255, 255, 0.88) !important;
+}
+
+.st-key-upload-panel [data-testid="stFileUploaderDropzone"]:focus-within {
+    outline: 3px solid rgba(91, 91, 214, 0.22);
+    outline-offset: 2px;
+}
+
+.st-key-upload-panel [data-testid="stFileUploaderDropzone"] button[data-testid="stBaseButton-secondary"] {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 44px;
+    min-width: 112px;
+    padding: 0 16px !important;
+    border-color: var(--cl-primary) !important;
+    background: var(--cl-primary) !important;
+    color: #ffffff !important;
+    font-size: 0.9rem !important;
+    line-height: 1.2 !important;
+    opacity: 1 !important;
+    visibility: visible !important;
     white-space: nowrap;
+}
+
+.st-key-upload-panel [data-testid="stFileUploaderDropzone"] button[data-testid="stBaseButton-secondary"] * {
+    color: #ffffff !important;
+    font-size: inherit !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+.st-key-upload-panel [data-testid="stFileUploaderDropzone"] button[data-testid="stBaseButton-secondary"]:hover {
+    border-color: var(--cl-primary-hover) !important;
+    background: var(--cl-primary-hover) !important;
+}
+
+.st-key-upload-panel [data-testid="stFileUploader"] button[data-testid="stBaseButton-borderlessIcon"],
+.st-key-upload-panel [data-testid="stFileUploader"] button[aria-label*="remove" i],
+.st-key-upload-panel [data-testid="stFileUploader"] button[aria-label*="add" i],
+.st-key-upload-panel [data-testid="stFileUploader"] button[title*="remove" i],
+.st-key-upload-panel [data-testid="stFileUploader"] button[title*="add" i] {
+    box-sizing: border-box;
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    width: 36px !important;
+    min-width: 36px !important;
+    height: 36px !important;
+    min-height: 36px !important;
+    margin: 0 4px !important;
+    padding: 0 !important;
+    border: 1px solid var(--cl-border-strong) !important;
+    border-radius: 8px !important;
+    background: var(--cl-surface) !important;
+    color: var(--cl-muted) !important;
+    box-shadow: 0 1px 2px rgba(26, 29, 46, 0.10) !important;
+}
+
+.st-key-upload-panel [data-testid="stFileUploader"] button[data-testid="stBaseButton-borderlessIcon"] *,
+.st-key-upload-panel [data-testid="stFileUploader"] button[aria-label*="remove" i] *,
+.st-key-upload-panel [data-testid="stFileUploader"] button[aria-label*="add" i] *,
+.st-key-upload-panel [data-testid="stFileUploader"] button[title*="remove" i] *,
+.st-key-upload-panel [data-testid="stFileUploader"] button[title*="add" i] * {
+    color: inherit !important;
+    font-size: 1.15rem !important;
+    line-height: 1 !important;
+}
+
+.st-key-upload-panel [data-testid="stFileUploader"] button[data-testid="stBaseButton-borderlessIcon"]:hover,
+.st-key-upload-panel [data-testid="stFileUploader"] button[aria-label*="remove" i]:hover,
+.st-key-upload-panel [data-testid="stFileUploader"] button[aria-label*="add" i]:hover,
+.st-key-upload-panel [data-testid="stFileUploader"] button[title*="remove" i]:hover,
+.st-key-upload-panel [data-testid="stFileUploader"] button[title*="add" i]:hover {
+    border-color: var(--cl-primary) !important;
+    background: var(--cl-surface-soft) !important;
+    color: var(--cl-primary) !important;
+}
+
+.st-key-upload-panel [data-testid="stFileUploaderDropzoneInstructions"] {
+    color: var(--cl-muted) !important;
+}
+
+.st-key-upload-panel [data-testid="stFileUploaderDropzoneInstructions"] small {
+    color: var(--cl-muted) !important;
+}
+
+.st-key-upload-panel [data-testid="stFileUploaderDropzoneInstructions"] [data-testid="stIconMaterial"] {
+    color: var(--cl-primary) !important;
+}
+
+.st-key-upload-panel .st-key-btn_cancelar_carga {
+    margin-top: 12px;
+}
+
+.st-key-upload-panel .st-key-btn_cancelar_carga button {
+    min-height: 44px;
 }
 
 /* ── Panel y tabla de datos ─────────────────────────────────────────────────── */

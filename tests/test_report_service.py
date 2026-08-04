@@ -1,4 +1,4 @@
-"""Pruebas de generación del PDF estadístico (RF-06)."""
+"""Pruebas de generación de reportes PDF (RF-06 y reporte de resultados)."""
 
 import unittest
 
@@ -6,6 +6,7 @@ import pandas as pd
 
 from services.report_service import ServicioReportes
 from services.statistics_service import ServicioEstadisticas
+from services.training_service import ServicioEntrenamiento
 
 
 def _crear_dataset() -> pd.DataFrame:
@@ -23,6 +24,17 @@ def _crear_dataset() -> pd.DataFrame:
     return pd.DataFrame(filas)
 
 
+def _crear_dataset_entrenamiento() -> pd.DataFrame:
+    """Crea dos grupos claramente separados para un entrenamiento reproducible."""
+    return pd.DataFrame(
+        {
+            "Extraversión": [1.0, 1.2, 0.8, 1.1, 4.8, 5.0, 4.9, 4.7],
+            "Responsabilidad": [1.1, 0.9, 1.0, 1.2, 4.9, 4.7, 5.0, 4.8],
+        },
+        index=[f"persona_{numero}" for numero in range(1, 9)],
+    )
+
+
 class PruebasServicioReportes(unittest.TestCase):
     def test_genera_un_pdf_conteniendo_el_resumen_estadistico(self):
         resumen = ServicioEstadisticas().calcular_resumen(_crear_dataset())
@@ -33,6 +45,22 @@ class PruebasServicioReportes(unittest.TestCase):
 
         self.assertTrue(contenido.startswith(b"%PDF"))
         self.assertGreater(len(contenido), 5_000)
+
+    def test_genera_un_pdf_con_los_resultados_del_entrenamiento(self):
+        resultado = ServicioEntrenamiento(random_state=7).entrenar_modelo(
+            _crear_dataset_entrenamiento(), maximo_k=3
+        )
+
+        contenido = ServicioReportes().generar_reporte_entrenamiento(
+            resultado, nombre_dataset="cuestionario_prueba.csv"
+        )
+
+        self.assertTrue(contenido.startswith(b"%PDF"))
+        self.assertGreater(len(contenido), 5_000)
+
+    def test_reporte_de_entrenamiento_rechaza_tipos_invalidos(self):
+        with self.assertRaises(TypeError):
+            ServicioReportes().generar_reporte_entrenamiento(object())
 
 
 if __name__ == "__main__":
