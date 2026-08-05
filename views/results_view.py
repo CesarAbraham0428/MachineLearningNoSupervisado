@@ -325,12 +325,14 @@ def renderizar_vista_resultados() -> None:
         centros = servicio.crear_tabla_centros(resultado)
         interpretaciones = servicio.crear_interpretaciones_grupos(resultado)
         perfiles = servicio.crear_resumen_perfiles_grupos(resultado)
-        datos_originales = st.session_state.get("dataframe_cargado")
+        datos_activos = st.session_state.get("dataframe_filtrado")
+        if not isinstance(datos_activos, pd.DataFrame):
+            datos_activos = st.session_state.get("dataframe_cargado")
         asignaciones = servicio.crear_tabla_asignaciones(
             resultado,
             datos_originales=(
-                datos_originales
-                if isinstance(datos_originales, pd.DataFrame)
+                datos_activos
+                if isinstance(datos_activos, pd.DataFrame)
                 else None
             ),
         )
@@ -410,8 +412,8 @@ def renderizar_vista_resultados() -> None:
 
     with st.expander("Ver asignación de cada registro"):
         st.caption(
-            "Cada fila conserva su identificador y los valores mostrados en "
-            "Datos cargados, junto con el grupo asignado por K-Means."
+            "Cada fila conserva su identificador y los valores activos elegidos "
+            "en Datos cargados, junto con el grupo asignado por K-Means."
         )
         st.dataframe(
             asignaciones,
