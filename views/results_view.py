@@ -324,6 +324,7 @@ def renderizar_vista_resultados() -> None:
         proyeccion = servicio.crear_proyeccion_pca(resultado)
         centros = servicio.crear_tabla_centros(resultado)
         interpretaciones = servicio.crear_interpretaciones_grupos(resultado)
+        perfiles = servicio.crear_resumen_perfiles_grupos(resultado)
         datos_originales = st.session_state.get("dataframe_cargado")
         asignaciones = servicio.crear_tabla_asignaciones(
             resultado,
@@ -375,14 +376,23 @@ def renderizar_vista_resultados() -> None:
     )
     st.plotly_chart(_grafica_perfil(centros, variable), width="stretch")
 
-    with st.container(border=True):
-        st.subheader("Interpretación breve de los grupos")
-        st.caption(
-            "Resume los dos o tres rasgos que más distinguen a cada grupo en lenguaje "
-            "cotidiano. No es un diagnóstico ni define a cada persona individual."
-        )
-        for _, fila in interpretaciones.iterrows():
-            st.markdown(f"**{fila['Grupo']}:** {fila['Interpretación']}")
+    st.subheader("Perfil e interpretación de cada grupo")
+    st.caption(
+        "El perfil predominante resume los dos o tres rasgos que más distinguen a "
+        "cada grupo. El detalle muestra los valores que respaldan esa lectura."
+    )
+    perfiles_por_grupo = perfiles.set_index("Grupo")["Perfil"]
+    for grupo, lecturas_grupo in interpretaciones.groupby("Grupo", sort=False):
+        with st.container(border=True):
+            st.markdown(f"**{grupo} - Perfil predominante:** {perfiles_por_grupo[grupo]}")
+            with st.expander("Ver cómo se obtuvo este perfil"):
+                for _, fila in lecturas_grupo.iterrows():
+                    st.markdown(
+                        f"**{fila['Rasgo']}:** {fila['Comparación']} "
+                        f"({fila['Valor del grupo']:.2f} frente a "
+                        f"{fila['Promedio general']:.2f}). "
+                        f"{fila['Interpretación']}"
+                    )
 
     st.subheader("Resumen de los grupos")
     st.dataframe(

@@ -52,18 +52,50 @@ class PruebasServicioResultados(unittest.TestCase):
         self.assertIn("Identificador", asignaciones.columns)
         self.assertIn("Grupo asignado", asignaciones.columns)
 
-    def test_crea_interpretaciones_comparadas_con_el_promedio(self):
+    def test_crea_interpretaciones_por_rasgo_y_comparacion(self):
         interpretaciones = self.servicio.crear_interpretaciones_grupos(self.resultado)
 
-        self.assertEqual(len(interpretaciones), self.resultado.k_usado)
         self.assertEqual(
-            interpretaciones.columns.tolist(), ["Grupo", "Interpretación"]
+            len(interpretaciones),
+            self.resultado.k_usado * len(self.resultado.columnas),
+        )
+        self.assertEqual(
+            interpretaciones.columns.tolist(),
+            [
+                "Grupo",
+                "Rasgo",
+                "Valor del grupo",
+                "Promedio general",
+                "Comparación",
+                "Interpretación",
+            ],
+        )
+        self.assertTrue(
+            interpretaciones.groupby("Grupo")["Rasgo"].count().eq(
+                len(self.resultado.columnas)
+            ).all()
         )
         texto = " ".join(interpretaciones["Interpretación"])
         self.assertIn("sociables", texto)
-        self.assertIn("disciplinadas", texto)
-        self.assertIn("reservadas", texto)
+        self.assertIn("disciplinados", texto)
+        self.assertTrue(
+            interpretaciones["Comparación"].isin(
+                [
+                    "Supera el promedio",
+                    "Está por debajo del promedio",
+                    "Está cerca del promedio",
+                ]
+            ).all()
+        )
 
+    def test_resume_el_perfil_predominante_de_cada_grupo(self):
+        perfiles = self.servicio.crear_resumen_perfiles_grupos(self.resultado)
+
+        self.assertEqual(len(perfiles), self.resultado.k_usado)
+        self.assertEqual(perfiles.columns.tolist(), ["Grupo", "Perfil"])
+        texto = " ".join(perfiles["Perfil"])
+        self.assertIn("sociables", texto)
+        self.assertIn("disciplinados", texto)
     def test_asignaciones_incluyen_valores_originales_en_el_orden_entrenado(self):
         datos_originales = pd.DataFrame(
             {

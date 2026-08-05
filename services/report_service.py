@@ -763,22 +763,41 @@ class ServicioReportes:
 
     @staticmethod
     def _parrafos_interpretaciones_grupos(
-        interpretaciones: pd.DataFrame, estilos: dict[str, ParagraphStyle]
-    ) -> list[Paragraph]:
-        """Convierte las explicaciones breves de los grupos en texto para el PDF."""
+        interpretaciones: pd.DataFrame,
+        perfiles: pd.DataFrame,
+        estilos: dict[str, ParagraphStyle],
+    ) -> list:
+        """Convierte las lecturas por rasgo en texto para el PDF."""
         parrafos = [
             Paragraph(
-                "Resume los dos o tres rasgos que más distinguen a cada grupo en lenguaje "
-                "cotidiano. No es un diagnóstico ni define a cada persona individual.",
+                "Cada frase compara el promedio del grupo con el promedio general de "
+                "referencia. Las explicaciones describen tendencias del grupo, no de "
+                "una persona individual.",
                 estilos["cuerpo"],
             )
         ]
-        for _, fila in interpretaciones.iterrows():
-            grupo = escape(str(fila["Grupo"]))
-            descripcion = escape(str(fila["Interpretación"]))
-            parrafos.append(
-                Paragraph(f"<b>{grupo}:</b> {descripcion}", estilos["cuerpo"])
+        perfiles_por_grupo = perfiles.set_index("Grupo")["Perfil"]
+        for grupo, lecturas_grupo in interpretaciones.groupby("Grupo", sort=False):
+            parrafos.extend(
+                [
+                    Spacer(1, 7),
+                    Paragraph(f"<b>{escape(str(grupo))}</b>", estilos["cuerpo"]),
+                    Paragraph(
+                        f"<b>Perfil predominante:</b> "
+                        f"{escape(str(perfiles_por_grupo[grupo]))}",
+                        estilos["cuerpo"],
+                    ),
+                ]
             )
+            for _, fila in lecturas_grupo.iterrows():
+                texto = (
+                    f"<b>{escape(str(fila['Rasgo']))}:</b> "
+                    f"{escape(str(fila['Comparación']))} "
+                    f"({float(fila['Valor del grupo']):.2f} frente a "
+                    f"{float(fila['Promedio general']):.2f}). "
+                    f"{escape(str(fila['Interpretación']))}"
+                )
+                parrafos.append(Paragraph(texto, estilos["cuerpo"]))
         return parrafos
 
     @classmethod
@@ -1104,6 +1123,7 @@ class ServicioReportes:
         interpretaciones = servicio_resultados.crear_interpretaciones_grupos(
             resultado
         )
+        perfiles = servicio_resultados.crear_resumen_perfiles_grupos(resultado)
 
         fecha = fecha_generacion or datetime.now()
         estilos = self._estilos()
@@ -1194,8 +1214,8 @@ class ServicioReportes:
                 Spacer(1, 6),
                 self._tabla_centros_entrenamiento(centros, estilos),
                 PageBreak(),
-                Paragraph("Interpretación breve de los grupos", estilos["seccion"]),
-                *self._parrafos_interpretaciones_grupos(interpretaciones, estilos),
+                Paragraph("Perfil e interpretación por rasgo de los grupos", estilos["seccion"]),
+                *self._parrafos_interpretaciones_grupos(interpretaciones, perfiles, estilos),
                 PageBreak(),
                 Paragraph("Gráficas del entrenamiento", estilos["seccion"]),
                 Paragraph(

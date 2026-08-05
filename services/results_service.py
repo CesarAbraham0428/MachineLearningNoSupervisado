@@ -149,15 +149,68 @@ class ServicioResultados:
     def crear_interpretaciones_grupos(
         self, resultado: ResultadoEntrenamiento
     ) -> pd.DataFrame:
-        """Explica los rasgos de cada grupo con un lenguaje cotidiano."""
+        """Crea una lectura clara de cada rasgo para cada grupo."""
         self._validar(resultado)
-        centros = resultado.centroides_estandarizados
+        centros = resultado.centroides_originales
+        promedios_generales = pd.Series(
+            resultado.escalador.mean_, index=resultado.columnas, dtype=float
+        )
+        escalas = pd.Series(
+            resultado.escalador.scale_, index=resultado.columnas, dtype=float
+        )
         umbral = 0.35
-        interpretaciones: list[dict[str, str]] = []
+        lecturas: list[dict[str, object]] = []
 
         for posicion, (_, centro) in enumerate(centros.iterrows(), start=1):
-            rasgos_representativos = (
-                centro[centro.abs() >= umbral]
+            for rasgo in resultado.columnas:
+                valor_grupo = float(centro[rasgo])
+                promedio_general = float(promedios_generales[rasgo])
+                diferencia_estandarizada = (
+                    valor_grupo - promedio_general
+                ) / float(escalas[rasgo])
+                if diferencia_estandarizada >= umbral:
+                    nivel = "alto"
+                    comparacion = "Supera el promedio"
+                elif diferencia_estandarizada <= -umbral:
+                    nivel = "bajo"
+                    comparacion = "Está por debajo del promedio"
+                else:
+                    nivel = "cercano"
+                    comparacion = "Está cerca del promedio"
+
+                lecturas.append(
+                    {
+                        "Grupo": f"Grupo {posicion}",
+                        "Rasgo": rasgo,
+                        "Valor del grupo": valor_grupo,
+                        "Promedio general": promedio_general,
+                        "Comparación": comparacion,
+                        "Interpretación": self._descripcion_rasgo(rasgo, nivel),
+                    }
+                )
+
+        return pd.DataFrame(lecturas)
+
+    def crear_resumen_perfiles_grupos(
+        self, resultado: ResultadoEntrenamiento
+    ) -> pd.DataFrame:
+        """Resume los rasgos que más distinguen el perfil de cada grupo."""
+        self._validar(resultado)
+        promedios_generales = pd.Series(
+            resultado.escalador.mean_, index=resultado.columnas, dtype=float
+        )
+        escalas = pd.Series(
+            resultado.escalador.scale_, index=resultado.columnas, dtype=float
+        )
+        umbral = 0.35
+        perfiles: list[dict[str, str]] = []
+
+        for posicion, (_, centro) in enumerate(
+            resultado.centroides_originales.iterrows(), start=1
+        ):
+            diferencias = (centro - promedios_generales) / escalas
+            rasgos = (
+                diferencias[abs(diferencias) >= umbral]
                 .abs()
                 .sort_values(ascending=False)
                 .head(3)
@@ -165,69 +218,100 @@ class ServicioResultados:
                 .tolist()
             )
             descripciones = [
-                self._descripcion_rasgo(
+                self._frase_perfil(
                     rasgo,
-                    "alto" if centro[rasgo] >= 0 else "bajo",
+                    "alto" if diferencias[rasgo] >= 0 else "bajo",
                 )
-                for rasgo in rasgos_representativos
+                for rasgo in rasgos
             ]
-
             if descripciones:
-                descripcion = (
-                    "Este grupo reúne principalmente a personas "
+                perfil = (
+                    "Este grupo reúne principalmente perfiles "
                     f"{self._unir_descripciones(descripciones)}."
                 )
             else:
-                descripcion = (
-                    "Este grupo reúne perfiles con un patrón cercano al promedio "
-                    "en los rasgos analizados."
+                perfil = (
+                    "Este grupo tiene un perfil cercano al promedio en los rasgos "
+                    "analizados."
                 )
+            perfiles.append({"Grupo": f"Grupo {posicion}", "Perfil": perfil})
 
-            interpretaciones.append(
-                {"Grupo": f"Grupo {posicion}", "Interpretación": descripcion}
-            )
-
-        return pd.DataFrame(interpretaciones)
+        return pd.DataFrame(perfiles)
 
     @staticmethod
-    def _descripcion_rasgo(rasgo: str, nivel: str) -> str:
-        """Traduce los rasgos Big Five a expresiones comprensibles."""
-        lecturas = {
+    def _frase_perfil(rasgo: str, nivel: str) -> str:
+        """Convierte un rasgo destacado en una frase breve de perfil."""
+        frases = {
             "extraversión": {
-                "alto": "sociables, comunicativas y con facilidad para participar en actividades sociales",
-                "bajo": "más reservadas y con menor interés por actividades sociales",
+                "alto": "más sociables y comunicativos",
+                "bajo": "más reservados al interactuar socialmente",
             },
             "estabilidad emocional": {
-                "alto": "tranquilas y seguras al afrontar situaciones de presión",
-                "bajo": "más sensibles al estrés y a la presión",
+                "alto": "más tranquilos ante situaciones de presión",
+                "bajo": "más sensibles al estrés y la presión",
             },
             "apertura a la experiencia": {
-                "alto": "creativas, imaginativas y abiertas a ideas y experiencias nuevas",
-                "bajo": "más prácticas y con preferencia por lo conocido",
+                "alto": "más creativos, imaginativos y abiertos a ideas nuevas",
+                "bajo": "más prácticos y con preferencia por lo conocido",
             },
             "responsabilidad": {
-                "alto": "organizadas, disciplinadas y constantes en sus tareas o estudios",
-                "bajo": "más flexibles y menos estructuradas al organizar tareas o estudios",
+                "alto": "más organizados, disciplinados y constantes",
+                "bajo": "más flexibles y menos estructurados al organizar tareas",
             },
             "amabilidad": {
-                "alto": "empáticas, cooperativas y consideradas con los demás",
-                "bajo": "más directas y competitivas al relacionarse con los demás",
+                "alto": "más empáticos y cooperativos",
+                "bajo": "más directos y competitivos al relacionarse",
             },
         }
-        lectura = lecturas.get(str(rasgo).strip().casefold())
-        if lectura:
-            return lectura[nivel]
-        comparacion = "por encima" if nivel == "alto" else "por debajo"
-        return f"valores de {rasgo} {comparacion} del promedio"
+        frase = frases.get(str(rasgo).strip().casefold())
+        if frase:
+            return frase[nivel]
+        direccion = "por encima" if nivel == "alto" else "por debajo"
+        return f"con {rasgo} {direccion} del promedio"
 
     @staticmethod
     def _unir_descripciones(descripciones: list[str]) -> str:
-        """Une descripciones breves para formar una oración natural."""
+        """Une descripciones de perfil en una oración legible."""
         if len(descripciones) == 1:
             return descripciones[0]
         if len(descripciones) == 2:
             return f"{descripciones[0]} y {descripciones[1]}"
         return f"{', '.join(descripciones[:-1])} y {descripciones[-1]}"
+    @staticmethod
+    def _descripcion_rasgo(rasgo: str, nivel: str) -> str:
+        """Devuelve una frase prefabricada para cada rasgo y comparación."""
+        lecturas = {
+            "extraversión": {
+                "alto": "Esto sugiere perfiles más sociables, comunicativos y participativos.",
+                "bajo": "Esto sugiere perfiles más reservados y con menor interés por la interacción social.",
+            },
+            "estabilidad emocional": {
+                "alto": "Esto sugiere perfiles más tranquilos y seguros al afrontar situaciones de presión.",
+                "bajo": "Esto sugiere perfiles más sensibles al estrés y a la presión.",
+            },
+            "apertura a la experiencia": {
+                "alto": "Esto sugiere perfiles más creativos, imaginativos y abiertos a ideas nuevas.",
+                "bajo": "Esto sugiere perfiles más prácticos y con preferencia por lo conocido.",
+            },
+            "responsabilidad": {
+                "alto": "Esto sugiere perfiles más organizados, disciplinados y constantes en tareas o estudios.",
+                "bajo": "Esto sugiere perfiles más flexibles y menos estructurados al organizar tareas o estudios.",
+            },
+            "amabilidad": {
+                "alto": "Esto sugiere perfiles más empáticos, cooperativos y considerados con los demás.",
+                "bajo": "Esto sugiere perfiles más directos y competitivos al relacionarse con los demás.",
+            },
+        }
+        if nivel == "cercano":
+            return (
+                "Este rasgo se mantiene cercano al promedio, por lo que no "
+                "distingue especialmente a este grupo."
+            )
+        lectura = lecturas.get(str(rasgo).strip().casefold())
+        if lectura:
+            return lectura[nivel]
+        direccion = "más alto" if nivel == "alto" else "más bajo"
+        return f"El valor de este rasgo es {direccion} que el promedio general."
 
     def crear_tabla_asignaciones(
         self,
