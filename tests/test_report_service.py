@@ -1,8 +1,10 @@
 """Pruebas de generación de reportes PDF (RF-06 y reporte de resultados)."""
 
 import unittest
+from unittest.mock import patch
 
 import pandas as pd
+from reportlab.graphics.shapes import Rect, String
 
 from services.report_service import ServicioReportes
 from services.dataset_service import crear_perfiles_big_five
@@ -42,12 +44,55 @@ class PruebasServicioReportes(unittest.TestCase):
             crear_perfiles_big_five(_crear_dataset())
         )
 
-        contenido = ServicioReportes().generar_reporte_estadistico(
-            resumen, nombre_dataset="cuestionario_prueba.csv"
-        )
+        generar_histograma = ServicioReportes._histograma_con_poligono
+        with patch.object(
+            ServicioReportes,
+            "_histograma_con_poligono",
+            wraps=generar_histograma,
+        ) as histograma:
+            contenido = ServicioReportes().generar_reporte_estadistico(
+                resumen, nombre_dataset="cuestionario_prueba.csv"
+            )
 
         self.assertTrue(contenido.startswith(b"%PDF"))
         self.assertGreater(len(contenido), 5_000)
+        self.assertEqual(
+            histograma.call_count,
+            resumen.cantidad_variables,
+        )
+
+    def test_tabla_estadistica_del_pdf_incluye_dispersion_y_cv(self):
+        resumen = ServicioEstadisticas().calcular_resumen(
+            crear_perfiles_big_five(_crear_dataset())
+        )
+
+        tabla = ServicioReportes._tabla_resumen(
+            resumen,
+            ServicioReportes._estilos(),
+        )
+        encabezados = [celda.text for celda in tabla._cellvalues[0]]
+
+        self.assertIn("Varianza", encabezados)
+        self.assertIn("Desv. est.", encabezados)
+        self.assertIn("CV (%)", encabezados)
+
+    def test_histograma_pdf_usa_limites_de_intervalo_y_ejes_de_la_vista(self):
+        tabla = ServicioEstadisticas.calcular_frecuencia_intervalos(
+            pd.Series([2.0, 2.1, 2.8, 3.4, 4.0]),
+            numero_intervalos=2,
+        )
+
+        dibujo = ServicioReportes._histograma_con_poligono(tabla, "Extraversión")
+        barras = [elemento for elemento in dibujo.contents if isinstance(elemento, Rect)]
+        textos = [elemento.text for elemento in dibujo.contents if isinstance(elemento, String)]
+
+        self.assertEqual(len(barras), 2)
+        self.assertAlmostEqual(barras[0].x + barras[0].width, barras[1].x)
+        self.assertIn("Distribución de Extraversión", textos)
+        self.assertIn("Puntaje del rasgo extraversión", textos)
+        self.assertIn("2.00", textos)
+        self.assertIn("3.00", textos)
+        self.assertIn("4.00", textos)
 
     def test_genera_un_pdf_con_los_resultados_del_entrenamiento(self):
         resultado = ServicioEntrenamiento(random_state=7).entrenar_modelo(

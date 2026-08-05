@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from io import BytesIO
+from math import ceil
 from pathlib import Path
 from xml.sax.saxutils import escape
 
@@ -25,13 +26,13 @@ from reportlab.graphics.charts.barcharts import VerticalBarChart
 from reportlab.graphics.charts.lineplots import ScatterPlot
 from reportlab.graphics.charts.piecharts import Pie
 from reportlab.graphics.charts.textlabels import Label
-from reportlab.graphics.shapes import Drawing, String
+from reportlab.graphics.shapes import Circle, Drawing, Line, PolyLine, Rect, String
 from reportlab.graphics.widgets.markers import makeMarker
 
 import pandas as pd
 
 from services.results_service import ProyeccionPCA, ServicioResultados
-from services.statistics_service import ResumenEstadistico
+from services.statistics_service import ResumenEstadistico, ServicioEstadisticas
 from services.training_service import ResultadoEntrenamiento
 
 
@@ -116,6 +117,26 @@ class ServicioReportes:
                 spaceAfter=0,
                 alignment=TA_CENTER,
                 textColor=colors.white,
+            ),
+            "metadato_clave": ParagraphStyle(
+                "MetadatoClaveClusterLab",
+                parent=base["BodyText"],
+                fontName="Helvetica-Bold",
+                fontSize=9,
+                leading=11,
+                textColor=ServicioReportes._TINTA,
+                spaceBefore=0,
+                spaceAfter=0,
+            ),
+            "metadato_valor": ParagraphStyle(
+                "MetadatoValorClusterLab",
+                parent=base["BodyText"],
+                fontName="Helvetica",
+                fontSize=9,
+                leading=11,
+                textColor=colors.HexColor("#3C332C"),
+                spaceBefore=0,
+                spaceAfter=0,
             ),
         }
 
@@ -345,7 +366,17 @@ class ServicioReportes:
     def _tabla_resumen(
         resumen: ResumenEstadistico, estilos: dict[str, ParagraphStyle]
     ) -> Table:
-        encabezados = ["Rasgo", "Media", "Mediana", "Moda", "Desv. est.", "Mín.", "Máx."]
+        encabezados = [
+            "Rasgo",
+            "Media",
+            "Mediana",
+            "Moda",
+            "Varianza",
+            "Desv. est.",
+            "CV (%)",
+            "Mín.",
+            "Máx.",
+        ]
         filas = [
             [Paragraph(encabezado, estilos["tabla_encabezado"]) for encabezado in encabezados]
         ]
@@ -356,7 +387,9 @@ class ServicioReportes:
                     f"{valores['Media']:.2f}",
                     f"{valores['Mediana']:.2f}",
                     f"{valores['Moda']:.2f}",
+                    f"{valores['Varianza']:.2f}",
                     f"{valores['Desviación estándar']:.2f}",
+                    f"{valores['Coeficiente de variación (%)']:.2f}",
                     f"{valores['Mínimo']:.2f}",
                     f"{valores['Máximo']:.2f}",
                 ]
@@ -364,7 +397,17 @@ class ServicioReportes:
 
         tabla = Table(
             filas,
-            colWidths=[4.05 * inch, 0.62 * inch, 0.65 * inch, 0.55 * inch, 0.75 * inch, 0.5 * inch, 0.5 * inch],
+            colWidths=[
+                2.65 * inch,
+                0.58 * inch,
+                0.65 * inch,
+                0.52 * inch,
+                0.68 * inch,
+                0.72 * inch,
+                0.62 * inch,
+                0.5 * inch,
+                0.5 * inch,
+            ],
             repeatRows=1,
             hAlign="LEFT",
         )
@@ -382,6 +425,199 @@ class ServicioReportes:
             )
         )
         return tabla
+
+    @staticmethod
+    def _tabla_frecuencias(
+        tabla_frecuencia: pd.DataFrame,
+        estilos: dict[str, ParagraphStyle],
+    ) -> Table:
+        """Convierte una distribución agrupada en una tabla lista para el PDF."""
+        encabezados = ["Intervalo", "Marca de clase", "f", "Fr", "%", "F"]
+        filas = [
+            [Paragraph(encabezado, estilos["tabla_encabezado"]) for encabezado in encabezados]
+        ]
+        for _, fila in tabla_frecuencia.iterrows():
+            filas.append(
+                [
+                    Paragraph(escape(str(fila["Intervalo"])), estilos["tabla"]),
+                    f"{float(fila['Marca de Clase']):.2f}",
+                    str(int(fila["f"])),
+                    f"{float(fila['Fr']):.4f}",
+                    f"{float(fila['%']):.2f}%",
+                    str(int(fila["F"])),
+                ]
+            )
+
+        tabla = Table(
+            filas,
+            colWidths=[2.05 * inch, 1.1 * inch, 0.65 * inch, 0.8 * inch, 0.7 * inch, 0.65 * inch],
+            repeatRows=1,
+            hAlign="LEFT",
+        )
+        tabla.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), ServicioReportes._TINTA),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#D8C3A5")),
+                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, ServicioReportes._FONDO_TABLA]),
+                    ("ALIGN", (1, 1), (-1, -1), "CENTER"),
+                    ("FONTSIZE", (1, 1), (-1, -1), 7),
+                    ("TOPPADDING", (0, 0), (-1, -1), 2.5),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
+                ]
+            )
+        )
+        return tabla
+
+    @classmethod
+    def _histograma_con_poligono(
+        cls,
+        tabla_frecuencia: pd.DataFrame,
+        rasgo: str,
+        ancho: float = 680,
+        alto: float = 238,
+    ) -> Drawing:
+        """Dibuja la misma distribución por límites que muestra la vista Streamlit."""
+        dibujo = Drawing(ancho, alto)
+        dibujo.add(
+            String(
+                0,
+                alto - 14,
+                f"Distribución de {rasgo}",
+                fontName="Helvetica-Bold",
+                fontSize=9.5,
+                fillColor=cls._TINTA,
+            )
+        )
+
+        frecuencias = tabla_frecuencia["f"].astype(float).tolist()
+        limites = (
+            tabla_frecuencia["Intervalo"]
+            .str.extract(
+                r"^\[\s*([-+]?\d+(?:\.\d+)?)\s*-\s*([-+]?\d+(?:\.\d+)?)",
+                expand=True,
+            )
+            .astype(float)
+        )
+        limites_inferiores = limites[0].tolist()
+        limites_superiores = limites[1].tolist()
+        if not limites_inferiores or len(limites_inferiores) != len(frecuencias):
+            return dibujo
+
+        limites_eje_x = [*limites_inferiores, limites_superiores[-1]]
+        minimo_x, maximo_x = limites_eje_x[0], limites_eje_x[-1]
+        izquierda, base = 46, 36
+        ancho_grafica, alto_grafica = ancho - 70, alto - 78
+        maximo_frecuencia = max(frecuencias, default=1)
+        limite_y = max(1, int(ceil(maximo_frecuencia * 1.2)))
+        paso_y = max(1, int(ceil(limite_y / 5)))
+        limite_y = paso_y * int(ceil(limite_y / paso_y))
+
+        for valor_y in range(0, limite_y + 1, paso_y):
+            y = base + (valor_y / limite_y) * alto_grafica
+            dibujo.add(
+                Line(
+                    izquierda,
+                    y,
+                    izquierda + ancho_grafica,
+                    y,
+                    strokeColor=colors.HexColor("#E8DDD0"),
+                    strokeWidth=0.45,
+                )
+            )
+            dibujo.add(
+                String(
+                    izquierda - 7,
+                    y - 2.5,
+                    str(valor_y),
+                    fontName="Helvetica",
+                    fontSize=6.5,
+                    fillColor=cls._GRIS,
+                    textAnchor="end",
+                )
+            )
+
+        dibujo.add(Line(izquierda, base, izquierda, base + alto_grafica, strokeColor=cls._TINTA, strokeWidth=0.7))
+        dibujo.add(Line(izquierda, base, izquierda + ancho_grafica, base, strokeColor=cls._TINTA, strokeWidth=0.7))
+
+        def posicion_x(valor: float) -> float:
+            if maximo_x == minimo_x:
+                return izquierda
+            return izquierda + ((valor - minimo_x) / (maximo_x - minimo_x)) * ancho_grafica
+
+        puntos: list[tuple[float, float]] = []
+        for frecuencia, limite_inferior, limite_superior in zip(
+            frecuencias,
+            limites_inferiores,
+            limites_superiores,
+            strict=True,
+        ):
+            x = posicion_x(limite_inferior)
+            ancho_barra = posicion_x(limite_superior) - x
+            altura_barra = (frecuencia / limite_y) * alto_grafica
+            dibujo.add(
+                Rect(
+                    x,
+                    base,
+                    ancho_barra,
+                    altura_barra,
+                    fillColor=colors.HexColor("#B876FF"),
+                    strokeColor=colors.HexColor("#8A52C7"),
+                    strokeWidth=0.55,
+                )
+            )
+            centro_x = x + ancho_barra / 2
+            centro_y = base + altura_barra
+            puntos.append((centro_x, centro_y))
+            dibujo.add(String(centro_x, centro_y + 5, str(int(frecuencia)), fontName="Helvetica-Bold", fontSize=6.5, fillColor=cls._TINTA, textAnchor="middle"))
+
+        if len(puntos) >= 2:
+            dibujo.add(PolyLine(puntos, strokeColor=colors.HexColor("#4C286E"), strokeWidth=2.2, fillColor=None))
+        for punto_x, punto_y in puntos:
+            dibujo.add(Circle(punto_x, punto_y, 3.1, fillColor=colors.HexColor("#4C286E"), strokeColor=colors.white, strokeWidth=0.8))
+
+        for indice, limite in enumerate(limites_eje_x):
+            posicion = posicion_x(limite)
+            if indice == 0:
+                anclaje = "start"
+            elif indice == len(limites_eje_x) - 1:
+                anclaje = "end"
+            else:
+                anclaje = "middle"
+            dibujo.add(
+                String(
+                    posicion,
+                    base - 10,
+                    f"{limite:.2f}",
+                    fontName="Helvetica",
+                    fontSize=6.2,
+                    fillColor=cls._GRIS,
+                    textAnchor=anclaje,
+                )
+            )
+        dibujo.add(
+            String(
+                izquierda + ancho_grafica / 2,
+                5,
+                f"Puntaje del rasgo {rasgo.lower()}",
+                fontName="Helvetica",
+                fontSize=7,
+                fillColor=cls._GRIS,
+                textAnchor="middle",
+            )
+        )
+        etiqueta_y = Label()
+        etiqueta_y.x = 8
+        etiqueta_y.y = base + alto_grafica / 2
+        etiqueta_y.setText("frecuencia")
+        etiqueta_y.fontName = "Helvetica"
+        etiqueta_y.fontSize = 7
+        etiqueta_y.fillColor = cls._GRIS
+        etiqueta_y.angle = 90
+        etiqueta_y.boxAnchor = "c"
+        dibujo.add(etiqueta_y)
+        return dibujo
 
     @staticmethod
     def _tabla_evaluacion_k(
@@ -706,14 +942,26 @@ class ServicioReportes:
             HRFlowable(width="100%", thickness=1, color=self._AZUL, spaceAfter=12),
         ]
         metadatos = [
-            ["Dataset", escape(nombre_dataset)],
+            ["Dataset", nombre_dataset],
             ["Fecha de generación", fecha.strftime("%d/%m/%Y %H:%M")],
             ["Registros analizados", str(resumen.cantidad_registros)],
             ["Variables analizadas", str(resumen.cantidad_variables)],
-            ["Valores de rasgo evaluados", str(resumen.cantidad_registros * resumen.cantidad_variables)],
+            [
+                "Valores de rasgo evaluados",
+                str(resumen.cantidad_registros * resumen.cantidad_variables),
+            ],
             ["Datos faltantes", str(int(resumen.faltantes_por_rasgo.sum()))],
         ]
-        tabla_metadatos = Table(metadatos, colWidths=[1.55 * inch, 5.3 * inch])
+        tabla_metadatos = Table(
+            [
+                [
+                    Paragraph(escape(str(clave)), estilos["metadato_clave"]),
+                    Paragraph(escape(str(valor)), estilos["metadato_valor"]),
+                ]
+                for clave, valor in metadatos
+            ],
+            colWidths=[2.05 * inch, 4.8 * inch],
+        )
         tabla_metadatos.setStyle(
             TableStyle(
                 [
@@ -766,6 +1014,34 @@ class ServicioReportes:
                 ),
             ]
         )
+
+        for rasgo in resumen.dimensiones_por_registro.columns:
+            valores_rasgo = resumen.dimensiones_por_registro[rasgo]
+            parametros = ServicioEstadisticas.calcular_parametros_intervalos(valores_rasgo)
+            tabla_frecuencia = ServicioEstadisticas.calcular_frecuencia_intervalos(
+                valores_rasgo,
+                parametros=parametros,
+            )
+            historia.extend(
+                [
+                    PageBreak(),
+                    Paragraph(
+                        f"Distribución por intervalos: {escape(str(rasgo))}",
+                        estilos["seccion"],
+                    ),
+                    Paragraph(
+                        f"R = {parametros.rango:.2f} &nbsp;&nbsp;|&nbsp;&nbsp; "
+                        f"K = {parametros.k} &nbsp;&nbsp;|&nbsp;&nbsp; "
+                        f"A = {parametros.amplitud:.2f} &nbsp;&nbsp;|&nbsp;&nbsp; "
+                        f"N = {parametros.cantidad_datos}",
+                        estilos["cuerpo"],
+                    ),
+                    Spacer(1, 6),
+                    self._tabla_frecuencias(tabla_frecuencia, estilos),
+                    Spacer(1, 10),
+                    self._histograma_con_poligono(tabla_frecuencia, str(rasgo)),
+                ]
+            )
 
         documento.build(historia, onFirstPage=self._encabezado_pie, onLaterPages=self._encabezado_pie)
         return salida.getvalue()
