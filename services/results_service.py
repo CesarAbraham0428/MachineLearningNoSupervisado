@@ -146,6 +146,89 @@ class ServicioResultados:
         )
         return centros
 
+    def crear_interpretaciones_grupos(
+        self, resultado: ResultadoEntrenamiento
+    ) -> pd.DataFrame:
+        """Explica los rasgos de cada grupo con un lenguaje cotidiano."""
+        self._validar(resultado)
+        centros = resultado.centroides_estandarizados
+        umbral = 0.35
+        interpretaciones: list[dict[str, str]] = []
+
+        for posicion, (_, centro) in enumerate(centros.iterrows(), start=1):
+            rasgos_representativos = (
+                centro[centro.abs() >= umbral]
+                .abs()
+                .sort_values(ascending=False)
+                .head(3)
+                .index
+                .tolist()
+            )
+            descripciones = [
+                self._descripcion_rasgo(
+                    rasgo,
+                    "alto" if centro[rasgo] >= 0 else "bajo",
+                )
+                for rasgo in rasgos_representativos
+            ]
+
+            if descripciones:
+                descripcion = (
+                    "Este grupo reúne principalmente a personas "
+                    f"{self._unir_descripciones(descripciones)}."
+                )
+            else:
+                descripcion = (
+                    "Este grupo reúne perfiles con un patrón cercano al promedio "
+                    "en los rasgos analizados."
+                )
+
+            interpretaciones.append(
+                {"Grupo": f"Grupo {posicion}", "Interpretación": descripcion}
+            )
+
+        return pd.DataFrame(interpretaciones)
+
+    @staticmethod
+    def _descripcion_rasgo(rasgo: str, nivel: str) -> str:
+        """Traduce los rasgos Big Five a expresiones comprensibles."""
+        lecturas = {
+            "extraversión": {
+                "alto": "sociables, comunicativas y con facilidad para participar en actividades sociales",
+                "bajo": "más reservadas y con menor interés por actividades sociales",
+            },
+            "estabilidad emocional": {
+                "alto": "tranquilas y seguras al afrontar situaciones de presión",
+                "bajo": "más sensibles al estrés y a la presión",
+            },
+            "apertura a la experiencia": {
+                "alto": "creativas, imaginativas y abiertas a ideas y experiencias nuevas",
+                "bajo": "más prácticas y con preferencia por lo conocido",
+            },
+            "responsabilidad": {
+                "alto": "organizadas, disciplinadas y constantes en sus tareas o estudios",
+                "bajo": "más flexibles y menos estructuradas al organizar tareas o estudios",
+            },
+            "amabilidad": {
+                "alto": "empáticas, cooperativas y consideradas con los demás",
+                "bajo": "más directas y competitivas al relacionarse con los demás",
+            },
+        }
+        lectura = lecturas.get(str(rasgo).strip().casefold())
+        if lectura:
+            return lectura[nivel]
+        comparacion = "por encima" if nivel == "alto" else "por debajo"
+        return f"valores de {rasgo} {comparacion} del promedio"
+
+    @staticmethod
+    def _unir_descripciones(descripciones: list[str]) -> str:
+        """Une descripciones breves para formar una oración natural."""
+        if len(descripciones) == 1:
+            return descripciones[0]
+        if len(descripciones) == 2:
+            return f"{descripciones[0]} y {descripciones[1]}"
+        return f"{', '.join(descripciones[:-1])} y {descripciones[-1]}"
+
     def crear_tabla_asignaciones(
         self,
         resultado: ResultadoEntrenamiento,

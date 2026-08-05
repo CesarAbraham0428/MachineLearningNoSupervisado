@@ -101,12 +101,19 @@ class PruebasServicioReportes(unittest.TestCase):
             _crear_dataset_entrenamiento(), maximo_k=3
         )
 
-        contenido = ServicioReportes().generar_reporte_entrenamiento(
-            resultado, nombre_dataset="cuestionario_prueba.csv"
-        )
+        crear_parrafos = ServicioReportes._parrafos_interpretaciones_grupos
+        with patch.object(
+            ServicioReportes,
+            "_parrafos_interpretaciones_grupos",
+            wraps=crear_parrafos,
+        ) as interpretaciones_pdf:
+            contenido = ServicioReportes().generar_reporte_entrenamiento(
+                resultado, nombre_dataset="cuestionario_prueba.csv"
+            )
 
         self.assertTrue(contenido.startswith(b"%PDF"))
         self.assertGreater(len(contenido), 5_000)
+        self.assertEqual(interpretaciones_pdf.call_count, 1)
 
     def test_reporte_de_entrenamiento_rechaza_tipos_invalidos(self):
         with self.assertRaises(TypeError):

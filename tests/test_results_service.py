@@ -52,6 +52,18 @@ class PruebasServicioResultados(unittest.TestCase):
         self.assertIn("Identificador", asignaciones.columns)
         self.assertIn("Grupo asignado", asignaciones.columns)
 
+    def test_crea_interpretaciones_comparadas_con_el_promedio(self):
+        interpretaciones = self.servicio.crear_interpretaciones_grupos(self.resultado)
+
+        self.assertEqual(len(interpretaciones), self.resultado.k_usado)
+        self.assertEqual(
+            interpretaciones.columns.tolist(), ["Grupo", "Interpretación"]
+        )
+        texto = " ".join(interpretaciones["Interpretación"])
+        self.assertIn("sociables", texto)
+        self.assertIn("disciplinadas", texto)
+        self.assertIn("reservadas", texto)
+
     def test_asignaciones_incluyen_valores_originales_en_el_orden_entrenado(self):
         datos_originales = pd.DataFrame(
             {

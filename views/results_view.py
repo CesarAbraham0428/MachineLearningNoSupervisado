@@ -323,6 +323,7 @@ def renderizar_vista_resultados() -> None:
         resumen = servicio.crear_resumen_grupos(resultado)
         proyeccion = servicio.crear_proyeccion_pca(resultado)
         centros = servicio.crear_tabla_centros(resultado)
+        interpretaciones = servicio.crear_interpretaciones_grupos(resultado)
         datos_originales = st.session_state.get("dataframe_cargado")
         asignaciones = servicio.crear_tabla_asignaciones(
             resultado,
@@ -373,6 +374,15 @@ def renderizar_vista_resultados() -> None:
         persist_state="session",
     )
     st.plotly_chart(_grafica_perfil(centros, variable), width="stretch")
+
+    with st.container(border=True):
+        st.subheader("Interpretación breve de los grupos")
+        st.caption(
+            "Resume los dos o tres rasgos que más distinguen a cada grupo en lenguaje "
+            "cotidiano. No es un diagnóstico ni define a cada persona individual."
+        )
+        for _, fila in interpretaciones.iterrows():
+            st.markdown(f"**{fila['Grupo']}:** {fila['Interpretación']}")
 
     st.subheader("Resumen de los grupos")
     st.dataframe(

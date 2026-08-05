@@ -761,6 +761,26 @@ class ServicioReportes:
         )
         return tabla
 
+    @staticmethod
+    def _parrafos_interpretaciones_grupos(
+        interpretaciones: pd.DataFrame, estilos: dict[str, ParagraphStyle]
+    ) -> list[Paragraph]:
+        """Convierte las explicaciones breves de los grupos en texto para el PDF."""
+        parrafos = [
+            Paragraph(
+                "Resume los dos o tres rasgos que más distinguen a cada grupo en lenguaje "
+                "cotidiano. No es un diagnóstico ni define a cada persona individual.",
+                estilos["cuerpo"],
+            )
+        ]
+        for _, fila in interpretaciones.iterrows():
+            grupo = escape(str(fila["Grupo"]))
+            descripcion = escape(str(fila["Interpretación"]))
+            parrafos.append(
+                Paragraph(f"<b>{grupo}:</b> {descripcion}", estilos["cuerpo"])
+            )
+        return parrafos
+
     @classmethod
     def _grafica_dispersion(
         cls, proyeccion: ProyeccionPCA, ancho: float = 680, alto: float = 260
@@ -1081,6 +1101,9 @@ class ServicioReportes:
         resumen_grupos = servicio_resultados.crear_resumen_grupos(resultado)
         proyeccion = servicio_resultados.crear_proyeccion_pca(resultado)
         centros = servicio_resultados.crear_tabla_centros(resultado)
+        interpretaciones = servicio_resultados.crear_interpretaciones_grupos(
+            resultado
+        )
 
         fecha = fecha_generacion or datetime.now()
         estilos = self._estilos()
@@ -1170,6 +1193,9 @@ class ServicioReportes:
                 ),
                 Spacer(1, 6),
                 self._tabla_centros_entrenamiento(centros, estilos),
+                PageBreak(),
+                Paragraph("Interpretación breve de los grupos", estilos["seccion"]),
+                *self._parrafos_interpretaciones_grupos(interpretaciones, estilos),
                 PageBreak(),
                 Paragraph("Gráficas del entrenamiento", estilos["seccion"]),
                 Paragraph(
