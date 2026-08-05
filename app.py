@@ -41,14 +41,35 @@ def _cargar_estilos() -> None:
         "modelos.css",
         "profesional.css",
     ]
-    
+
     css_completo = []
     for archivo in archivos_css:
         ruta = _DIR_ESTILOS / archivo
         if ruta.exists():
             css_completo.append(ruta.read_text(encoding="utf-8"))
-            
+
     st.html(f"<style>{''.join(css_completo)}</style>")
+
+
+def _aplicar_navegacion_pendiente() -> None:
+    """Traslada una navegación solicitada por otra vista antes de crear el widget.
+
+    Streamlit no permite modificar `st.session_state[key]` de un widget después de
+    que ese widget ya fue instanciado en el mismo run. Por eso, en vez de tocar
+    "main_navigation" directamente desde otra vista, esa vista guarda el valor en
+    "_pending_navigation" y llama a `st.rerun()`. Aquí, en el siguiente run y ANTES
+    de crear el widget, copiamos ese valor pendiente a "main_navigation", lo cual
+    sí está permitido.
+    """
+    if "_pending_navigation" in st.session_state:
+        st.session_state["main_navigation"] = st.session_state.pop("_pending_navigation")
+
+
+def _mostrar_toast_pendiente() -> None:
+    """Muestra un toast solicitado por otra vista justo antes de un rerun."""
+    if "_pending_toast" in st.session_state:
+        mensaje, icono = st.session_state.pop("_pending_toast")
+        st.toast(mensaje, icon=icono)
 
 
 def _renderizar_navegacion() -> int:
@@ -120,10 +141,16 @@ def main() -> None:
         initial_sidebar_state="collapsed",
     )
 
+    # IMPORTANTE: esto debe ejecutarse ANTES de crear el widget "main_navigation".
+    _aplicar_navegacion_pendiente()
+
     _cargar_estilos()
 
     _renderizar_encabezado()
     tab_activa = _renderizar_navegacion()
+
+    # Puede mostrarse en cualquier punto del run; lo hacemos aquí por orden.
+    _mostrar_toast_pendiente()
 
     if tab_activa == 0:
         renderizar_vista_datos()
