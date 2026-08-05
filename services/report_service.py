@@ -260,14 +260,6 @@ class ServicioReportes:
     @classmethod
     def _tarjetas(cls, indicadores: list[tuple[str, str, colors.Color]]) -> Table:
         """Construye una cuadrícula compacta de tarjetas de indicadores clave."""
-    def _tarjetas_resumen(cls, resumen: ResumenEstadistico) -> Table:
-        """Presenta los indicadores clave como una cuadrícula compacta."""
-        indicadores = [
-            ("REGISTROS", str(resumen.cantidad_registros), cls._AZUL),
-            ("VARIABLES", str(resumen.cantidad_variables), cls._VIOLETA),
-            ("VALORES", str(resumen.cantidad_registros * resumen.cantidad_variables), cls._VERDE),
-            ("FALTANTES", str(int(resumen.faltantes_por_rasgo.sum())), cls._AMBAR),
-        ]
         celdas = []
         for etiqueta, valor, color in indicadores:
             celdas.append(
@@ -300,7 +292,7 @@ class ServicioReportes:
             ("REGISTROS", str(resumen.cantidad_registros), cls._AZUL),
             ("VARIABLES", str(resumen.cantidad_variables), cls._VIOLETA),
             ("RESPUESTAS", str(resumen.cantidad_registros * resumen.cantidad_variables), cls._VERDE),
-            ("FALTANTES", str(int(resumen.faltantes_por_pregunta.sum())), cls._AMBAR),
+            ("FALTANTES", str(int(resumen.faltantes_por_rasgo.sum())), cls._AMBAR),
         ]
         return cls._tarjetas(indicadores)
 
