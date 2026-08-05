@@ -219,12 +219,15 @@ def _continuar_entrenamiento_en_dataset_activo(
     st.session_state["mapeo_likert"] = dict(artefacto.get("mapeo_likert", {}))
     st.session_state["columnas_likert"] = list(artefacto.get("columnas_likert", ()))
     st.session_state["tab_activa"] = 3
-    st.session_state["main_navigation"] = ":material/query_stats: Resultados"
     st.session_state["confirmacion_modelo_guardado"] = None
-    st.toast(
-        f'Se reentrenó "{modelo.nombre}" con {len(datos_listos)} registro(s) del '
-        "dataset activo.",
-        icon=":material/model_training:",
+
+    st.session_state["_pending_navigation"] = ":material/query_stats: Resultados"
+    st.session_state["_pending_toast"] = (
+        (
+            f'Se reentrenó "{modelo.nombre}" con {len(datos_listos)} registro(s) '
+            "del dataset activo."
+        ),
+        ":material/model_training:",
     )
     st.rerun()
 
