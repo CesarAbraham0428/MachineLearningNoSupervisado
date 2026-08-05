@@ -15,9 +15,20 @@ from services.statistics_service import ResumenEstadistico, ServicioEstadisticas
 
 
 def _obtener_datos_activos() -> pd.DataFrame | None:
-    """Obtiene las cinco dimensiones y conserva los filtros aplicados a filas."""
-    indices_filtrados = st.session_state.get("indices_filas_filtradas")
+    """Obtiene el subconjunto filtrado y limpio vigente en Datos cargados."""
+    firma_filtro = st.session_state.get("firma_filtro_activo")
     limpio = st.session_state.get("dataset_limpio")
+    if (
+        isinstance(limpio, pd.DataFrame)
+        and st.session_state.get("filtro_calidad") == firma_filtro
+    ):
+        return limpio.copy()
+
+    filtrado = st.session_state.get("dataframe_filtrado")
+    if isinstance(filtrado, pd.DataFrame):
+        return filtrado.copy()
+
+    indices_filtrados = st.session_state.get("indices_filas_filtradas")
     base = limpio if isinstance(limpio, pd.DataFrame) else st.session_state.get("dataframe_cargado")
     if not isinstance(base, pd.DataFrame):
         return None
@@ -25,7 +36,6 @@ def _obtener_datos_activos() -> pd.DataFrame | None:
         indices = base.index.intersection(pd.Index(indices_filtrados))
         return base.loc[indices].copy()
     return base.copy()
-
 
 def _grafica_promedios(resumen: ResumenEstadistico):
     datos = resumen.promedio_dimensiones.rename_axis("Rasgo").reset_index(name="Promedio")
@@ -157,7 +167,7 @@ def renderizar_vista_estadisticas() -> None:
 
     descripcion, accion_reporte = st.columns([3, 1], vertical_alignment="bottom")
     with descripcion:
-        st.caption("Resumen de los cinco rasgos que utilizará K-Means.")
+        st.caption("Resumen de los rasgos activos elegidos en Datos cargados.")
     with accion_reporte:
         reporte_pdf = ServicioReportes().generar_reporte_estadistico(
             resumen,

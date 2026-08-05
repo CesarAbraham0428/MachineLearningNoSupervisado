@@ -9,6 +9,7 @@ import pandas as pd
 import streamlit as st
 
 from services.dataset_service import (
+    DIMENSIONES_BIG_FIVE,
     ErrorDatos,
     crear_perfiles_big_five,
     crear_perfiles_con_contexto,
@@ -22,6 +23,32 @@ from services.synthetic_data_service import (
 _SIN_FILTRO = "Sin filtro"
 _TODOS = "Todos"
 
+
+def _tiene_minimo_rasgos_big_five(columnas: list[str]) -> bool:
+    """Indica si la selección permite entrenar K-Means."""
+    rasgos = set(DIMENSIONES_BIG_FIVE)
+    return sum(columna in rasgos for columna in columnas) >= 2
+
+
+def _validar_seleccion_columnas(todas_columnas: list[str]) -> None:
+    """Conserva la última selección válida de al menos dos rasgos Big Five."""
+    seleccion = [
+        columna
+        for columna in st.session_state.get("ms_columnas_filtro", [])
+        if columna in todas_columnas
+    ]
+    if _tiene_minimo_rasgos_big_five(seleccion):
+        st.session_state.columnas_seleccionadas = seleccion
+        return
+
+    anterior = [
+        columna
+        for columna in st.session_state.get("columnas_seleccionadas", [])
+        if columna in todas_columnas
+    ]
+    seleccion_segura = anterior if _tiene_minimo_rasgos_big_five(anterior) else todas_columnas
+    st.session_state["ms_columnas_filtro"] = seleccion_segura
+    st.session_state["aviso_minimo_rasgos"] = True
 
 def _etiqueta_columna(columna: object) -> str:
     """Devuelve un nombre visible sin modificar el encabezado original."""
@@ -746,11 +773,19 @@ def renderizar_vista_datos() -> None:
     seleccion_previa = [
         c for c in st.session_state.columnas_seleccionadas if c in todas_columnas
     ]
-    # Si no hay selección previa, usar todas las columnas como estado inicial
-    if not seleccion_previa:
+    # El análisis requiere al menos dos rasgos Big Five. Si una sesión antigua
+    # conserva una selección menor, se recupera una selección segura antes de
+    # que se renderice el widget.
+    if not _tiene_minimo_rasgos_big_five(seleccion_previa):
         seleccion_previa = todas_columnas
         st.session_state.columnas_seleccionadas = todas_columnas
 
+    seleccion_widget = st.session_state.get("ms_columnas_filtro")
+    seleccion_widget_valida = isinstance(seleccion_widget, list) and _tiene_minimo_rasgos_big_five(
+        [columna for columna in seleccion_widget if columna in todas_columnas]
+    )
+    if not seleccion_widget_valida:
+        st.session_state["ms_columnas_filtro"] = seleccion_previa
     # Calcular df_filtrado ANTES del contenedor usando la selección persistida,
     # para que el botón de exportar ya tenga el dataset correcto al renderizarse.
     columnas_persistidas = st.session_state.get(
@@ -759,9 +794,11 @@ def renderizar_vista_datos() -> None:
     columnas_persistidas = [
         columna for columna in columnas_persistidas if columna in todas_columnas
     ]
-    columnas_persistidas_validas = len(columnas_persistidas) >= 1
+    columnas_persistidas_validas = _tiene_minimo_rasgos_big_five(
+        columnas_persistidas
+    )
     columnas_para_exportar = (
-        columnas_persistidas if columnas_persistidas_validas else todas_columnas
+        columnas_persistidas if columnas_persistidas_validas else seleccion_previa
     )
     columna_filtro_exportacion = st.session_state.get(
         "sel_columna_filtro", _SIN_FILTRO
@@ -833,15 +870,17 @@ def renderizar_vista_datos() -> None:
 
         # ── Selector de columnas ──────────────────────────────────────────
         columnas_elegidas = st.multiselect(
-            "Columnas visibles en la tabla",
+            "Columnas visibles y activas (mínimo 2 rasgos Big Five)",
             options=todas_columnas,
-            default=seleccion_previa,
             format_func=_etiqueta_columna,
             placeholder="Selecciona al menos 2 columnas…",
             key="ms_columnas_filtro",
+            on_change=_validar_seleccion_columnas,
+            args=(todas_columnas,),
             help=(
-                "Este control solo cambia la tabla y la exportación. Los filtros "
-                "de filas sí se aplican a estadísticas y entrenamiento."
+                "Debes conservar al menos dos rasgos Big Five. Las columnas elegidas "
+                "se aplican a la tabla, exportación, estadísticas y entrenamiento; "
+                "los filtros de filas también se respetan en todas esas vistas."
             ),
         )
 
@@ -894,16 +933,21 @@ def renderizar_vista_datos() -> None:
                     persist_state="session",
                 )
 
-        columnas_validas = len(columnas_elegidas) >= 1
+        columnas_validas = _tiene_minimo_rasgos_big_five(columnas_elegidas)
+        if st.session_state.pop("aviso_minimo_rasgos", False):
+            st.warning(
+                "Selecciona al menos dos rasgos Big Five. Se conservó la última "
+                "selección válida para que el análisis no use una sola variable.",
+                icon=":material/info:",
+            )
 
-        # Persistir selección en session_state para el siguiente rerun
-        if columnas_elegidas:
+        # Solo una selección con al menos dos rasgos Big Five se vuelve activa.
+        if columnas_validas:
             st.session_state.columnas_seleccionadas = columnas_elegidas
         else:
-            # Si deseleccionaron todo, restauramos todas las columnas
-            st.session_state.columnas_seleccionadas = todas_columnas
+            columnas_elegidas = seleccion_previa
 
-        columnas_a_mostrar = columnas_elegidas if columnas_validas else todas_columnas
+        columnas_a_mostrar = columnas_elegidas
         df_filtrado = _obtener_subconjunto(
             df_cargado,
             columnas_a_mostrar,

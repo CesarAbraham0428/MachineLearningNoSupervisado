@@ -78,6 +78,15 @@ class PruebasServicioConjuntoDatos(unittest.TestCase):
 
         self.assertEqual(validados.columns.tolist(), list(DIMENSIONES_BIG_FIVE))
 
+    def test_permite_un_subconjunto_big_five_para_analisis(self):
+        columnas = list(DIMENSIONES_BIG_FIVE)[:3]
+        perfiles = pd.DataFrame({columna: [2.5, 3.5] for columna in columnas})
+
+        validados = validar_perfiles_big_five(
+            perfiles, permitir_subconjunto=True, minimo_columnas=2
+        )
+
+        self.assertEqual(validados.columns.tolist(), columnas)
     def test_conserva_contexto_para_filtrar_sin_conservar_preguntas(self):
         datos = _crear_dataset()
         datos["Grupo"] = ["A"]

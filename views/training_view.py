@@ -282,8 +282,8 @@ def _renderizar_modelo_kmeans() -> None:
     """Guía la selección de variables, recomendación de K y entrenamiento."""
     st.subheader("Configuración de K-Means")
     st.caption(
-        "K-Means reúne personas con perfiles parecidos utilizando exclusivamente "
-        "los cinco rasgos Big Five estandarizados."
+        "K-Means reúne personas con perfiles parecidos usando los rasgos Big Five "
+        "activos y estandarizados."
     )
 
     datos_preparados = _obtener_datos_preparados()
@@ -294,7 +294,9 @@ def _renderizar_modelo_kmeans() -> None:
         return
 
     try:
-        datos_preparados = validar_perfiles_big_five(datos_preparados)
+        datos_preparados = validar_perfiles_big_five(
+            datos_preparados, permitir_subconjunto=True, minimo_columnas=2
+        )
     except (ErrorDatos, TypeError) as error:
         st.error(f"Los perfiles no están listos para entrenar: {error}")
         return
@@ -310,7 +312,7 @@ def _renderizar_modelo_kmeans() -> None:
 
     st.markdown("**Variables que formarán los clústeres**")
     st.caption(
-        "El modelo utilizará conjuntamente los cinco rasgos Big Five: "
+        "El modelo utilizará conjuntamente los rasgos Big Five activos: "
         + ", ".join(columnas_numericas)
         + "."
     )
@@ -456,9 +458,20 @@ def _renderizar_modelo_kmeans() -> None:
             st.error(str(error))
 
 def _obtener_datos_activos() -> pd.DataFrame | None:
-    """Obtiene las cinco dimensiones y conserva cualquier filtro de filas."""
-    indices_filtrados = st.session_state.get("indices_filas_filtradas")
+    """Obtiene el subconjunto filtrado y limpio vigente en Datos cargados."""
+    firma_filtro = st.session_state.get("firma_filtro_activo")
     dataset_limpio = st.session_state.get("dataset_limpio")
+    if (
+        isinstance(dataset_limpio, pd.DataFrame)
+        and st.session_state.get("filtro_calidad") == firma_filtro
+    ):
+        return dataset_limpio.copy()
+
+    filtrado = st.session_state.get("dataframe_filtrado")
+    if isinstance(filtrado, pd.DataFrame):
+        return filtrado.copy()
+
+    indices_filtrados = st.session_state.get("indices_filas_filtradas")
     base = (
         dataset_limpio
         if isinstance(dataset_limpio, pd.DataFrame)
@@ -470,7 +483,6 @@ def _obtener_datos_activos() -> pd.DataFrame | None:
         indices = base.index.intersection(pd.Index(indices_filtrados))
         return base.loc[indices].copy()
     return base.copy()
-
 
 def _renderizar_fila_calidad(etiqueta: str, valor: str, clase_color: str = "") -> str:
     """Genera una fila HTML para la tabla del resumen de calidad."""
@@ -577,6 +589,10 @@ def renderizar_validacion_limpieza(
                     with st.spinner("Limpiando dataset…"):
                         res = limpiar_dataset(df)
                     st.session_state.dataset_limpio = res.dataset_limpio
+                    st.session_state.dataframe_filtrado = res.dataset_limpio.copy()
+                    st.session_state.indices_filas_filtradas = (
+                        res.dataset_limpio.index.tolist()
+                    )
                     st.session_state.resultado_limpieza = res
                     st.session_state.filtro_calidad = firma_filtro
                     st.toast("Dataset limpiado correctamente")
@@ -820,20 +836,22 @@ def _renderizar_preparacion_perfiles(
     df: pd.DataFrame,
     firma_filtro: tuple[tuple[str, ...], str, str] | None,
 ) -> None:
-    """Valida la matriz de cinco rasgos que consumirá K-Means."""
+    """Valida los rasgos Big Five activos que consumirá K-Means."""
     firma_datos = _firma_datos_likert(df, firma_filtro)
     diagnostico = diagnosticar_calidad(df)
     if diagnostico.requiere_limpieza:
         with st.container(border=True, key="big-five-panel-bloqueado"):
             st.subheader("Perfiles Big Five")
             st.warning(
-                "Limpia primero los problemas de calidad para preparar los cinco "
-                "rasgos para el entrenamiento."
+                "Limpia primero los problemas de calidad para preparar los rasgos "
+                "seleccionados para el entrenamiento."
             )
         return
 
     try:
-        perfiles = validar_perfiles_big_five(df)
+        perfiles = validar_perfiles_big_five(
+            df, permitir_subconjunto=True, minimo_columnas=2
+        )
     except (ErrorDatos, TypeError) as error:
         with st.container(border=True, key="big-five-panel-error"):
             st.subheader("Perfiles Big Five")
@@ -844,7 +862,7 @@ def _renderizar_preparacion_perfiles(
     with st.container(border=True, key="big-five-panel-listo"):
         st.subheader("Perfiles Big Five")
         st.success(
-            "Los 25 reactivos ya fueron resumidos en cinco dimensiones numéricas."
+            "Los rasgos seleccionados están listos como dimensiones numéricas."
         )
         st.caption(
             f"{len(perfiles):,} perfiles listos · "

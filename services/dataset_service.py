@@ -389,24 +389,47 @@ def crear_perfiles_con_contexto(datos: pd.DataFrame) -> pd.DataFrame:
     return pd.concat([preprocesado.dimensiones.copy(), contexto], axis=1)
 
 
-def validar_perfiles_big_five(datos: pd.DataFrame) -> pd.DataFrame:
-    """Valida y ordena un dataset que ya contiene los cinco rasgos Big Five."""
+def validar_perfiles_big_five(
+    datos: pd.DataFrame,
+    *,
+    permitir_subconjunto: bool = False,
+    minimo_columnas: int = 1,
+) -> pd.DataFrame:
+    """Valida rasgos Big Five y, opcionalmente, un subconjunto de ellos.
+
+    Por defecto exige las cinco dimensiones para conservar la validación usada
+    al preparar y generar datos. Las vistas de análisis pueden pedir un
+    subconjunto cuando la persona ocultó rasgos desde la pestaña de datos.
+    """
     if not isinstance(datos, pd.DataFrame):
         raise TypeError("Los perfiles deben recibirse como un DataFrame de pandas.")
     if datos.empty:
         raise ErrorDatos("El conjunto de perfiles no contiene registros.")
 
     columnas_esperadas = list(DIMENSIONES_BIG_FIVE)
-    faltantes = [columna for columna in columnas_esperadas if columna not in datos]
-    if faltantes:
+    columnas_disponibles = [
+        columna for columna in columnas_esperadas if columna in datos
+    ]
+    faltantes = [
+        columna for columna in columnas_esperadas if columna not in datos
+    ]
+    if faltantes and not permitir_subconjunto:
         raise ErrorDatos(
             "Faltan dimensiones Big Five: " + ", ".join(faltantes) + "."
         )
+    if permitir_subconjunto and len(columnas_disponibles) < minimo_columnas:
+        raise ErrorDatos(
+            "Selecciona al menos "
+            f"{minimo_columnas} rasgo(s) Big Five para continuar."
+        )
 
-    perfiles = datos.loc[:, columnas_esperadas].copy()
+    columnas_a_validar = (
+        columnas_disponibles if permitir_subconjunto else columnas_esperadas
+    )
+    perfiles = datos.loc[:, columnas_a_validar].copy()
     columnas_no_numericas = [
         columna
-        for columna in columnas_esperadas
+        for columna in columnas_a_validar
         if not pd.api.types.is_numeric_dtype(perfiles[columna])
     ]
     if columnas_no_numericas:

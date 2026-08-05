@@ -160,8 +160,8 @@ class ServicioEstadisticas:
         )
 
     def calcular_resumen(self, datos: pd.DataFrame) -> ResumenEstadistico:
-        """Calcula estadísticas directamente sobre los cinco rasgos activos."""
-        perfiles = validar_perfiles_big_five(datos)
+        """Calcula estadísticas sobre los rasgos Big Five actualmente activos."""
+        perfiles = validar_perfiles_big_five(datos, permitir_subconjunto=True)
         faltantes = perfiles.isna().sum()
         faltantes.name = "Faltantes"
         return ResumenEstadistico(

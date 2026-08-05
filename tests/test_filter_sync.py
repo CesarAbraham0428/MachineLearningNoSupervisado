@@ -66,6 +66,47 @@ class PruebasSincronizacionFiltros(unittest.TestCase):
         self.assertIsNone(app.session_state["resultado_entrenamiento"])
         self.assertNotIn("evaluaciones_k", app.session_state)
 
+    def test_estadisticas_priorizan_la_limpieza_del_filtro_actual(self):
+        datos = _perfiles_con_categoria()
+        firma = (("Extraversión", "Estabilidad emocional"), "Grupo", "A")
+        estadisticas = _preparar_app(tab=1)
+        estadisticas.session_state["dataframe_filtrado"] = datos
+        estadisticas.session_state["dataset_limpio"] = datos.iloc[:2].copy()
+        estadisticas.session_state["firma_filtro_activo"] = firma
+        estadisticas.session_state["filtro_calidad"] = firma
+        estadisticas.run(timeout=20)
+
+        metricas = {metrica.label: metrica.value for metrica in estadisticas.metric}
+        self.assertEqual(metricas[":material/table_rows: Perfiles analizados"], "2")
+    def test_no_permite_activar_menos_de_dos_rasgos_big_five(self):
+        app = _preparar_app().run(timeout=20)
+        solo_un_rasgo = [next(iter(DIMENSIONES_BIG_FIVE))]
+
+        app.multiselect[0].set_value(solo_un_rasgo).run(timeout=20)
+
+        activas = app.session_state["dataframe_filtrado"].columns.tolist()
+        rasgos_activos = [rasgo for rasgo in DIMENSIONES_BIG_FIVE if rasgo in activas]
+        self.assertGreaterEqual(len(rasgos_activos), 2)
+        self.assertEqual(len(app.warning), 1)
+    def test_estadisticas_y_entrenamiento_respetan_las_columnas_filtradas(self):
+        datos = _perfiles_con_categoria()
+        columnas = list(DIMENSIONES_BIG_FIVE)[:3]
+        filtrado = datos.loc[:, columnas]
+
+        estadisticas = _preparar_app(tab=1)
+        estadisticas.session_state["dataframe_filtrado"] = filtrado
+        estadisticas.run(timeout=20)
+        metricas = {metrica.label: metrica.value for metrica in estadisticas.metric}
+        self.assertEqual(metricas[":material/psychology: Rasgos analizados"], "3")
+
+        entrenamiento = _preparar_app(tab=2)
+        entrenamiento.session_state["dataframe_filtrado"] = filtrado
+        entrenamiento.run(timeout=20)
+        self.assertEqual(
+            entrenamiento.session_state["dataframe_entrenamiento"].columns.tolist(),
+            columnas,
+        )
+        self.assertFalse(entrenamiento.exception)
     def test_estadisticas_y_entrenamiento_consumen_las_filas_filtradas(self):
         estadisticas = _preparar_app(tab=1, indices=[2, 3]).run(timeout=20)
         metricas = {metrica.label: metrica.value for metrica in estadisticas.metric}
