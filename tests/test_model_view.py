@@ -1,12 +1,15 @@
 """Pruebas para seleccionar y reutilizar un modelo guardado (models_view)."""
 
 import unittest
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 import pandas as pd
 
 from services.model_service import ServicioModelo
 from services.training_service import ServicioEntrenamiento
 from views.models_view import (
+    _continuar_entrenamiento_en_dataset_activo,
     _predecir_clusters,
     _preparar_datos_para_prediccion,
     _tabla_centros_modelo,
@@ -105,6 +108,45 @@ class PruebasReutilizarModeloGuardado(unittest.TestCase):
         self.assertIsNone(datos_listos)
         self.assertIn("faltantes", error)
 
+
+
+    def test_continuar_entrenamiento_usa_centros_y_escalador_guardados(self):
+        datos = pd.DataFrame(
+            {
+                "Extraversión": [1.0, 1.1, 4.8, 4.9],
+                "Responsabilidad": [1.1, 1.0, 4.9, 4.8],
+            }
+        )
+        modelo_guardado = SimpleNamespace(nombre="Modelo de prueba")
+        modelo_previo = object()
+        escalador_previo = object()
+        artefacto = {
+            "columnas": ("Extraversión", "Responsabilidad"),
+            "modelo": modelo_previo,
+            "escalador": escalador_previo,
+        }
+        servicio = MagicMock()
+        resultado = object()
+        servicio.continuar_entrenamiento.return_value = resultado
+        streamlit = MagicMock()
+        streamlit.session_state = {}
+
+        with (
+            patch("views.models_view.ServicioEntrenamiento", return_value=servicio),
+            patch("views.models_view.st", streamlit),
+        ):
+            _continuar_entrenamiento_en_dataset_activo(
+                modelo_guardado, artefacto, datos
+            )
+
+        servicio.continuar_entrenamiento.assert_called_once_with(
+            datos,
+            ("Extraversión", "Responsabilidad"),
+            modelo_previo,
+            escalador_previo,
+        )
+        self.assertIs(streamlit.session_state["resultado_entrenamiento"], resultado)
+        streamlit.rerun.assert_called_once()
 
 if __name__ == "__main__":
     unittest.main()

@@ -200,12 +200,13 @@ def _grafica_distribucion_prediccion(asignaciones: pd.Series):
 def _continuar_entrenamiento_en_dataset_activo(
     modelo: ModeloGuardado, artefacto: dict, datos_listos: pd.DataFrame
 ) -> None:
-    """Reentrena con la misma configuración guardada, sobre el dataset activo."""
+    """Continúa desde los centros guardados sobre el dataset activo."""
     try:
-        resultado_nuevo = ServicioEntrenamiento().entrenar_modelo(
+        resultado_nuevo = ServicioEntrenamiento().continuar_entrenamiento(
             datos_listos,
-            k=modelo.cantidad_grupos,
-            maximo_k=max(8, modelo.cantidad_grupos),
+            tuple(artefacto["columnas"]),
+            artefacto["modelo"],
+            artefacto["escalador"],
         )
     except ErrorEntrenamiento as error:
         st.error(

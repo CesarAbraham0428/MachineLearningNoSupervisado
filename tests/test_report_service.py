@@ -1,10 +1,12 @@
 """Pruebas de generación de reportes PDF (RF-06 y reporte de resultados)."""
 
 import unittest
+from dataclasses import replace
 from unittest.mock import patch
 
 import pandas as pd
 from reportlab.graphics.shapes import Rect, String
+from reportlab.platypus import Paragraph
 
 from services.report_service import ServicioReportes
 from services.dataset_service import crear_perfiles_big_five
@@ -110,6 +112,22 @@ class PruebasServicioReportes(unittest.TestCase):
         with self.assertRaises(TypeError):
             ServicioReportes().generar_reporte_entrenamiento(object())
 
+
+
+    def test_reporte_reentrenado_explica_cuando_no_hay_evaluacion_de_k(self):
+        resultado = ServicioEntrenamiento(random_state=7).entrenar_modelo(
+            _crear_dataset_entrenamiento(), maximo_k=3
+        )
+        reentrenado = replace(resultado, evaluaciones=())
+
+        contenido_k = ServicioReportes._tabla_evaluacion_k(
+            reentrenado,
+            ServicioReportes._estilos(),
+        )
+
+        self.assertIsInstance(contenido_k, Paragraph)
+        self.assertIn("No se evaluaron valores adicionales de K", contenido_k.text)
+        self.assertIn("K =", contenido_k.text)
 
 if __name__ == "__main__":
     unittest.main()

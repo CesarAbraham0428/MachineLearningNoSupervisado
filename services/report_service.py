@@ -624,6 +624,14 @@ class ServicioReportes:
         resultado: ResultadoEntrenamiento, estilos: dict[str, ParagraphStyle]
     ) -> Table:
         """Compara la inercia y el Silhouette de cada valor de K evaluado."""
+        if not resultado.evaluaciones:
+            return Paragraph(
+                "No se evaluaron valores adicionales de K porque este resultado "
+                f"proviene de un reentrenamiento. Se conservó K = {resultado.k_usado} "
+                "del modelo base.",
+                estilos["cuerpo"],
+            )
+
         encabezados = ["K evaluado", "Inercia", "Silhouette", "Resultado"]
         filas = [
             [Paragraph(encabezado, estilos["tabla_encabezado"]) for encabezado in encabezados]

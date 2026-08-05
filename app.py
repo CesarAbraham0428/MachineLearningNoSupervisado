@@ -85,14 +85,27 @@ def _renderizar_navegacion() -> int:
     indice_actual = st.session_state.get("tab_activa", 0)
     indice_actual = max(0, min(indice_actual, len(secciones) - 1))
 
-    seleccion = st.segmented_control(
-        "Secciones del flujo",
-        options=list(secciones),
-        default=secciones[indice_actual],
-        key="main_navigation",
-        label_visibility="collapsed",
-        width="stretch",
-    )
+    # Si el contador de modelos cambia, la etiqueta anterior deja de ser una
+    # opción válida. Se actualiza antes de crear el widget.
+    if (
+        "main_navigation" in st.session_state
+        and st.session_state["main_navigation"] not in secciones
+    ):
+        st.session_state["main_navigation"] = secciones[indice_actual]
+
+    parametros_navegacion = {
+        "label": "Secciones del flujo",
+        "options": list(secciones),
+        "key": "main_navigation",
+        "label_visibility": "collapsed",
+        "width": "stretch",
+    }
+    # Streamlit advierte si una misma clave recibe a la vez `default` y un
+    # valor en session_state. El valor inicial solo se define la primera vez.
+    if "main_navigation" not in st.session_state:
+        parametros_navegacion["default"] = secciones[indice_actual]
+
+    seleccion = st.segmented_control(**parametros_navegacion)
     seleccion = seleccion or secciones[indice_actual]
     indice_nuevo = secciones.index(seleccion)
 
