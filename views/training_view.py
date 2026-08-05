@@ -299,6 +299,8 @@ def _renderizar_modelo_kmeans() -> None:
         st.error(f"Los perfiles no están listos para entrenar: {error}")
         return
 
+    columnas_numericas = datos_preparados.columns.tolist()
+
     _renderizar_reutilizacion_modelos(datos_preparados, columnas_numericas)
 
     resumen_izquierda, resumen_centro, resumen_derecha = st.columns(3)

@@ -65,11 +65,16 @@ body,
     font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
 }
 
-[data-testid="stIconMaterial"] {
+[data-testid="stIconMaterial"],
+[data-testid="stAlertDynamicIcon"] {
     font-family: "Material Symbols Rounded", "Material Symbols Outlined", sans-serif !important;
     font-weight: normal;
     font-style: normal;
     line-height: 1;
+    /* Resguardo: si por alguna razón la fuente de íconos no cargara, este
+       recorte evita que el nombre del icono (texto de reserva, p. ej.
+       "check_circle") se desborde sobre el mensaje de al lado. */
+    overflow: hidden;
 }
 
 ::selection {
