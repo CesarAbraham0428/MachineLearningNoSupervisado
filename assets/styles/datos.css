@@ -397,3 +397,10 @@
     .cl-dataset-meta  { align-items: flex-start; flex-direction: column; gap: 12px; }
     .cl-meta-date     { text-align: left; }
 }
+/* La etiqueta del boton de seleccion de archivo debe conservar contraste. */
+.st-key-upload-panel [data-testid="stFileUploaderDropzone"] button:not([data-testid="stBaseButton-borderlessIcon"]),
+.st-key-upload-panel [data-testid="stFileUploaderDropzone"] button:not([data-testid="stBaseButton-borderlessIcon"]) span,
+.st-key-upload-panel [data-testid="stFileUploaderDropzone"] button:not([data-testid="stBaseButton-borderlessIcon"]) p,
+.st-key-upload-panel [data-testid="stFileUploaderDropzone"] button:not([data-testid="stBaseButton-borderlessIcon"]) div {
+    color: #FFFFFF !important;
+}

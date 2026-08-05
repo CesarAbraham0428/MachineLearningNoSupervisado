@@ -3,10 +3,20 @@
 import io
 from datetime import date, datetime
 from html import escape
+from pathlib import Path
 
 import pandas as pd
 import streamlit as st
 
+from services.dataset_service import (
+    ErrorDatos,
+    crear_perfiles_big_five,
+    crear_perfiles_con_contexto,
+)
+from services.synthetic_data_service import (
+    ErrorDatosSinteticos,
+    generar_dataset_sintetico,
+)
 
 
 _SIN_FILTRO = "Sin filtro"
@@ -97,7 +107,12 @@ def _inicializar_estado() -> None:
     """Garantiza que la vista pueda arrancar sin un dataset cargado."""
     valores_iniciales = {
         "dataframe_cargado": None,
+        "dataset_fuente_original": None,
         "dataset_original": None,
+        "dataset_original_visualizacion": None,
+        "nombre_archivo_original": None,
+        "fecha_carga_original": None,
+        "dataset_sintetico_activo": False,
         "dataset_limpio": None,
         "resultado_limpieza": None,
         "nombre_archivo": None,
@@ -109,6 +124,8 @@ def _inicializar_estado() -> None:
         "modelos_guardados": [],
         "columnas_seleccionadas": [],
         "dataframe_filtrado": None,
+        "indices_filas_filtradas": None,
+        "firma_filtro_activo": None,
         "filtro_calidad": None,
         "dataframe_entrenamiento": None,
         "firma_entrenamiento": None,
@@ -117,6 +134,9 @@ def _inicializar_estado() -> None:
         "firma_likert": None,
         "columnas_likert": [],
         "rango_fechas_filtro": None,
+        "datos_sinteticos_generados": None,
+        "datos_combinados_sinteticos": None,
+        "resumen_generacion_sintetica": None,
     }
     for clave, valor in valores_iniciales.items():
         if clave not in st.session_state:
@@ -126,7 +146,12 @@ def _inicializar_estado() -> None:
 def _limpiar_estado_dataset() -> None:
     """Elimina el dataset activo del estado y vuelve a habilitar la opción de carga."""
     st.session_state.dataframe_cargado = None
+    st.session_state.dataset_fuente_original = None
     st.session_state.dataset_original = None
+    st.session_state.dataset_original_visualizacion = None
+    st.session_state.nombre_archivo_original = None
+    st.session_state.fecha_carga_original = None
+    st.session_state.dataset_sintetico_activo = False
     st.session_state.dataset_limpio = None
     st.session_state.resultado_limpieza = None
     st.session_state.nombre_archivo = None
@@ -138,6 +163,8 @@ def _limpiar_estado_dataset() -> None:
     st.session_state.pop("variable_perfil_resultados", None)
     st.session_state.columnas_seleccionadas = []
     st.session_state.dataframe_filtrado = None
+    st.session_state.indices_filas_filtradas = None
+    st.session_state.firma_filtro_activo = None
     st.session_state.filtro_calidad = None
     st.session_state.dataframe_entrenamiento = None
     st.session_state.firma_entrenamiento = None
@@ -146,6 +173,106 @@ def _limpiar_estado_dataset() -> None:
     st.session_state.firma_likert = None
     st.session_state.columnas_likert = []
     st.session_state.rango_fechas_filtro = None
+    _limpiar_resultado_sintetico()
+
+
+def _limpiar_resultado_sintetico() -> None:
+    """Descarta el resultado y restaura el original si estaba activo el combinado."""
+    if st.session_state.get("dataset_sintetico_activo"):
+        dataset_original = st.session_state.get("dataset_original_visualizacion")
+        if not isinstance(dataset_original, pd.DataFrame):
+            dataset_original = st.session_state.get("dataset_original")
+        if isinstance(dataset_original, pd.DataFrame):
+            st.session_state.dataframe_cargado = dataset_original.copy(deep=True)
+        st.session_state.nombre_archivo = st.session_state.get(
+            "nombre_archivo_original"
+        )
+        st.session_state.fecha_carga = st.session_state.get("fecha_carga_original")
+        st.session_state.dataset_sintetico_activo = False
+        _invalidar_resultados_dataset()
+
+    st.session_state.datos_sinteticos_generados = None
+    st.session_state.datos_combinados_sinteticos = None
+    st.session_state.resumen_generacion_sintetica = None
+
+
+def _invalidar_resultados_dataset() -> None:
+    """Limpia filtros y cálculos derivados al cambiar el dataset activo."""
+    st.session_state.dataset_limpio = None
+    st.session_state.resultado_limpieza = None
+    st.session_state.pagina_actual = 1
+    st.session_state.columnas_seleccionadas = []
+    st.session_state.dataframe_filtrado = None
+    st.session_state.indices_filas_filtradas = None
+    st.session_state.firma_filtro_activo = None
+    st.session_state.filtro_calidad = None
+    st.session_state.dataframe_entrenamiento = None
+    st.session_state.firma_entrenamiento = None
+    st.session_state.dataset_likert = None
+    st.session_state.mapeo_likert = {}
+    st.session_state.firma_likert = None
+    st.session_state.columnas_likert = []
+    st.session_state.modelo_entrenado = False
+    st.session_state.resultado_entrenamiento = None
+    st.session_state.pop("evaluaciones_k", None)
+    st.session_state.pop("firma_evaluaciones_k", None)
+    st.session_state.rango_fechas_filtro = None
+    st.session_state.pop("variable_perfil_resultados", None)
+
+
+def _invalidar_resultados_filtro() -> None:
+    """Descarta resultados calculados con una selección de filas anterior."""
+    st.session_state.dataset_limpio = None
+    st.session_state.resultado_limpieza = None
+    st.session_state.filtro_calidad = None
+    st.session_state.dataframe_entrenamiento = None
+    st.session_state.firma_entrenamiento = None
+    st.session_state.dataset_likert = None
+    st.session_state.mapeo_likert = {}
+    st.session_state.firma_likert = None
+    st.session_state.columnas_likert = []
+    st.session_state.modelo_entrenado = False
+    st.session_state.resultado_entrenamiento = None
+    st.session_state.pop("evaluaciones_k", None)
+    st.session_state.pop("firma_evaluaciones_k", None)
+    st.session_state.pop("variable_perfil_resultados", None)
+
+
+def _activar_datos_combinados() -> None:
+    """Convierte el resultado sintético en el dataset que consumen las vistas."""
+    datos_combinados = st.session_state.get("datos_combinados_sinteticos")
+    if not isinstance(datos_combinados, pd.DataFrame):
+        return
+
+    st.session_state.dataframe_cargado = datos_combinados.copy(deep=True)
+    st.session_state.dataset_sintetico_activo = True
+    st.session_state.mostrar_carga = False
+    _invalidar_resultados_dataset()
+    st.session_state.nombre_archivo = _nombre_descarga_sinteticos(
+        st.session_state.get("nombre_archivo_original"),
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    st.session_state.fecha_carga = datetime.now().strftime("%d/%m/%Y %H:%M")
+
+
+def _restaurar_datos_originales() -> None:
+    """Vuelve a usar el original y conserva el combinado para reutilizarlo."""
+    if not st.session_state.get("dataset_sintetico_activo"):
+        return
+
+    datos_originales = st.session_state.get("dataset_original_visualizacion")
+    if not isinstance(datos_originales, pd.DataFrame):
+        datos_originales = st.session_state.get("dataset_original")
+    if not isinstance(datos_originales, pd.DataFrame):
+        return
+
+    st.session_state.dataframe_cargado = datos_originales.copy(deep=True)
+    st.session_state.dataset_sintetico_activo = False
+    st.session_state.nombre_archivo = st.session_state.get(
+        "nombre_archivo_original"
+    )
+    st.session_state.fecha_carga = st.session_state.get("fecha_carga_original")
+    _invalidar_resultados_dataset()
 
 
 def _detectar_columnas_categoricas(df: pd.DataFrame) -> list[str]:
@@ -289,13 +416,29 @@ def _renderizar_carga() -> None:
             st.error(error)
             return
 
-        st.session_state.dataframe_cargado = df_nuevo
-        st.session_state.dataset_original = df_nuevo
+        try:
+            perfiles_big_five = crear_perfiles_big_five(df_nuevo)
+            perfiles_con_contexto = crear_perfiles_con_contexto(df_nuevo)
+        except (ErrorDatos, TypeError) as error:
+            st.error(
+                "El archivo no pudo transformarse a perfiles Big Five: " + str(error)
+            )
+            return
+
+        st.session_state.dataset_fuente_original = df_nuevo.copy(deep=True)
+        st.session_state.dataframe_cargado = perfiles_con_contexto.copy(deep=True)
+        st.session_state.dataset_original = perfiles_big_five.copy(deep=True)
+        st.session_state.dataset_original_visualizacion = (
+            perfiles_con_contexto.copy(deep=True)
+        )
+        st.session_state.dataset_sintetico_activo = False
         # RF-08: al cargar un nuevo archivo se invalida la limpieza anterior
         st.session_state.dataset_limpio = None
         st.session_state.resultado_limpieza = None
         st.session_state.nombre_archivo = archivo.name
+        st.session_state.nombre_archivo_original = archivo.name
         st.session_state.fecha_carga = datetime.now().strftime("%d/%m/%Y %H:%M")
+        st.session_state.fecha_carga_original = st.session_state.fecha_carga
         st.session_state.pagina_actual = 1
         st.session_state.mostrar_carga = False
         st.session_state.modelo_entrenado = False
@@ -303,6 +446,8 @@ def _renderizar_carga() -> None:
         st.session_state.pop("variable_perfil_resultados", None)
         st.session_state.columnas_seleccionadas = []
         st.session_state.dataframe_filtrado = None
+        st.session_state.indices_filas_filtradas = None
+        st.session_state.firma_filtro_activo = None
         st.session_state.filtro_calidad = None
         st.session_state.dataframe_entrenamiento = None
         st.session_state.firma_entrenamiento = None
@@ -313,9 +458,10 @@ def _renderizar_carga() -> None:
         st.session_state.resultado_limpieza = None
         st.session_state.dataset_limpio = None
         st.session_state.rango_fechas_filtro = None
+        _limpiar_resultado_sintetico()
         st.session_state["sel_columna_filtro"] = _SIN_FILTRO
         st.session_state["sel_valor_filtro"] = _TODOS
-        st.toast("Dataset cargado correctamente")
+        st.toast("Dataset convertido correctamente a cinco rasgos Big Five")
         st.rerun()
 
 
@@ -323,9 +469,12 @@ def _renderizar_tabla_paginada(df: pd.DataFrame) -> None:
     """Renderiza la tabla nativa con paginación compacta."""
     col_info, col_paginas = st.columns([3, 1], vertical_alignment="bottom")
     with col_paginas:
+        opciones_filas = [100, 500, 1000, 2000]
+        if st.session_state.get("filas_pagina") not in opciones_filas:
+            st.session_state["filas_pagina"] = opciones_filas[0]
         filas_por_pagina = st.selectbox(
             "Filas por página",
-            options=[10, 25, 50, 100],
+            options=opciones_filas,
             index=0,
             key="filas_pagina",
         )
@@ -418,6 +567,176 @@ def _renderizar_paginacion(pagina_actual: int, total_paginas: int) -> None:
             st.rerun()
 
 
+def _nombre_descarga_sinteticos(nombre_archivo: object, mime: str) -> str:
+    """Construye un nombre de descarga claro sin depender del formato de entrada."""
+    nombre = Path(str(nombre_archivo or "dataset")).stem or "dataset"
+    extension = ".csv" if mime == "text/csv" else ".xlsx"
+    return f"{nombre}_sinteticos_y_original{extension}"
+
+
+def _renderizar_generador_sinteticos(datos_originales: pd.DataFrame) -> None:
+    """Muestra la generacion basada en perfiles originales separados."""
+    with st.container(border=True, key="synthetic-data-panel"):
+        st.subheader("Generar perfiles Big Five sintéticos")
+        st.caption(
+            "Se seleccionan dos perfiles reales separados, se agrupan las respuestas "
+            "cercanas a cada uno y se generan nuevos perfiles alrededor de esos grupos. "
+            "Los registros originales no se modifican."
+        )
+
+        columna_cantidad, columna_accion = st.columns(
+            [2, 1], vertical_alignment="bottom"
+        )
+        with columna_cantidad:
+            cantidad = st.number_input(
+                "Nuevos registros a generar",
+                min_value=1,
+                max_value=10_000,
+                value=100,
+                step=1,
+                key="cantidad_registros_sinteticos",
+                help="El resultado final contendrá esta cantidad más los registros originales.",
+            )
+        with columna_accion:
+            generar = st.button(
+                "Generar registros",
+                key="btn_generar_datos_sinteticos",
+                type="primary",
+                width="stretch",
+                icon=":material/auto_awesome:",
+            )
+
+        if generar:
+            try:
+                with st.spinner("Generando perfiles sintéticos…"):
+                    resultado = generar_dataset_sintetico(
+                        datos_originales,
+                        cantidad=int(cantidad),
+                    )
+            except (ErrorDatosSinteticos, TypeError, ValueError) as error:
+                st.error(
+                    "No se pudieron generar los registros: " + str(error),
+                    icon=":material/error:",
+                )
+            else:
+                st.session_state.datos_sinteticos_generados = (
+                    resultado.datos_sinteticos
+                )
+                st.session_state.datos_combinados_sinteticos = (
+                    resultado.datos_combinados
+                )
+                st.session_state.resumen_generacion_sintetica = (
+                    resultado.resumen_grupos
+                )
+                st.toast("Datos sintéticos generados correctamente")
+                st.rerun()
+
+        datos_sinteticos = st.session_state.get("datos_sinteticos_generados")
+        datos_combinados = st.session_state.get("datos_combinados_sinteticos")
+        if not isinstance(datos_sinteticos, pd.DataFrame) or not isinstance(
+            datos_combinados, pd.DataFrame
+        ):
+            return
+
+        total_originales = len(datos_originales)
+        total_sinteticos = len(datos_sinteticos)
+        metrica_originales, metrica_sinteticos, metrica_final = st.columns(3)
+        metrica_originales.metric("Originales", f"{total_originales:,}")
+        metrica_sinteticos.metric("Sintéticos", f"{total_sinteticos:,}")
+        metrica_final.metric("Archivo final", f"{len(datos_combinados):,}")
+
+        resumen_grupos = st.session_state.get("resumen_generacion_sintetica")
+        if isinstance(resumen_grupos, pd.DataFrame):
+            st.caption(
+                "Cada subconjunto se genera por separado para conservar perfiles "
+                "distintos dentro del set simulado."
+            )
+            st.dataframe(resumen_grupos, width="stretch", hide_index=True)
+
+        st.caption(
+            "Vista previa: la columna Origen distingue las filas sintéticas de "
+            "las respuestas originales; no se agrega carrera, grupo ni otra etiqueta."
+        )
+        st.dataframe(datos_combinados.head(8), width="stretch", hide_index=True)
+
+        with st.expander("Ver parámetros estimados desde los originales"):
+            parametros = pd.DataFrame(
+                {
+                    "Media": datos_originales.mean(),
+                    "Desviación estándar": datos_originales.std(ddof=1),
+                }
+            ).round(3)
+            parametros.index.name = "Rasgo"
+            st.dataframe(parametros, width="stretch")
+
+        (
+            columna_descarga,
+            columna_activar,
+            columna_restaurar,
+            columna_borrado,
+        ) = st.columns(4)
+        datos_descarga, _, mime_descarga = _preparar_descarga(datos_combinados)
+        with columna_descarga:
+            st.download_button(
+                "Exportar sintéticos + original",
+                data=datos_descarga,
+                file_name=_nombre_descarga_sinteticos(
+                    st.session_state.get("nombre_archivo_original")
+                    or st.session_state.get("nombre_archivo"),
+                    mime_descarga,
+                ),
+                mime=mime_descarga,
+                key="btn_exportar_datos_sinteticos",
+                width="stretch",
+                icon=":material/download:",
+            )
+        with columna_activar:
+            datos_activos = st.session_state.get("dataset_sintetico_activo", False)
+            if st.button(
+                "Set de datos activo"
+                if datos_activos
+                else "Usar como set de datos",
+                key="btn_usar_datos_sinteticos",
+                type="primary" if not datos_activos else "secondary",
+                disabled=datos_activos,
+                width="stretch",
+                help=(
+                    "Usa el resultado combinado para la tabla, los filtros y "
+                    "la estadística descriptiva."
+                ),
+                icon=":material/dataset:",
+            ):
+                _activar_datos_combinados()
+                st.toast("Set de datos combinado activado")
+                st.rerun()
+        with columna_restaurar:
+            datos_activos = st.session_state.get("dataset_sintetico_activo", False)
+            if st.button(
+                "Restaurar original",
+                key="btn_restaurar_datos_originales",
+                type="secondary",
+                disabled=not datos_activos,
+                width="stretch",
+                help=(
+                    "Vuelve a usar el dataset original en la tabla, los filtros "
+                    "y la estadística descriptiva."
+                ),
+                icon=":material/restore:",
+            ):
+                _restaurar_datos_originales()
+                st.toast("Dataset original restaurado")
+                st.rerun()
+        with columna_borrado:
+            if st.button(
+                "Borrar resultado sintético",
+                key="btn_borrar_datos_sinteticos",
+                type="secondary",
+                width="stretch",
+                icon=":material/delete:",
+            ):
+                _limpiar_resultado_sintetico()
+                st.toast("Resultado sintético eliminado")
+                st.rerun()
 
 def renderizar_vista_datos() -> None:
     """Renderiza la interfaz de datos (carga, filtros, exportación y tabla)."""
@@ -453,7 +772,7 @@ def renderizar_vista_datos() -> None:
     columnas_persistidas = [
         columna for columna in columnas_persistidas if columna in todas_columnas
     ]
-    columnas_persistidas_validas = len(columnas_persistidas) >= 2
+    columnas_persistidas_validas = len(columnas_persistidas) >= 1
     columnas_para_exportar = (
         columnas_persistidas if columnas_persistidas_validas else todas_columnas
     )
@@ -483,7 +802,11 @@ def renderizar_vista_datos() -> None:
         )
         with col_titulo:
             st.subheader("Conjunto de datos")
-            st.caption("Consulta y administra la información importada.")
+            st.caption(
+                "Cada registro representa una persona mediante sus cinco rasgos "
+                "Big Five. Las columnas de contexto se conservan únicamente para "
+                "filtrar filas y nunca se incorporan a K-Means."
+            )
 
         with col_exportar:
             datos_descarga, nombre_descarga, mime_descarga = _preparar_descarga(df_para_exportar)
@@ -511,7 +834,10 @@ def renderizar_vista_datos() -> None:
                 key="btn_borrar_dataset",
                 type="secondary",
                 width="stretch",
-                help="Elimina el conjunto de datos activo y vuelve a mostrar el apartado de carga",
+                help=(
+                    "Elimina de memoria el original, el combinado y cualquier "
+                    "resultado sintético; después vuelve a mostrar la carga."
+                ),
                 icon=":material/delete:",
             ):
                 _limpiar_estado_dataset()
@@ -520,13 +846,16 @@ def renderizar_vista_datos() -> None:
 
         # ── Selector de columnas ──────────────────────────────────────────
         columnas_elegidas = st.multiselect(
-            "Filtrar columnas a mostrar",
+            "Columnas visibles en la tabla",
             options=todas_columnas,
             default=seleccion_previa,
             format_func=_etiqueta_columna,
             placeholder="Selecciona al menos 2 columnas…",
             key="ms_columnas_filtro",
-            help="Elige las columnas que deseas visualizar. Se requieren mínimo 2 columnas para realizar clustering.",
+            help=(
+                "Este control solo cambia la tabla y la exportación. Los filtros "
+                "de filas sí se aplican a estadísticas y entrenamiento."
+            ),
         )
 
         col_filtro, col_valor = st.columns(2)
@@ -578,15 +907,7 @@ def renderizar_vista_datos() -> None:
                     persist_state="session",
                 )
 
-        # Validar mínimo 2 columnas para clustering
-        columnas_validas = len(columnas_elegidas) >= 2
-        if columnas_elegidas and not columnas_validas:
-            st.warning(
-                "⚠ Se requieren **mínimo 2 columnas** para que el algoritmo de "
-                "clustering (ML no supervisado) pueda generar al menos 2 grupos. "
-                "Selecciona al menos una columna adicional.",
-                icon=None,
-            )
+        columnas_validas = len(columnas_elegidas) >= 1
 
         # Persistir selección en session_state para el siguiente rerun
         if columnas_elegidas:
@@ -608,25 +929,12 @@ def renderizar_vista_datos() -> None:
             valor_filtro,
         )
 
-        # Un resultado de limpieza solo es válido para el subconjunto que lo
-        # originó. Si cambia cualquier filtro, se descarta para evitar mostrar
-        # métricas o un estado de calidad pertenecientes a otra selección.
-        if (
-            st.session_state.get("filtro_calidad") is not None
-            and st.session_state.get("filtro_calidad") != firma_filtro
-        ):
-            st.session_state.dataset_limpio = None
-            st.session_state.resultado_limpieza = None
-            st.session_state.filtro_calidad = None
-            st.session_state.dataframe_entrenamiento = None
-            st.session_state.firma_entrenamiento = None
-            st.session_state.dataset_likert = None
-            st.session_state.mapeo_likert = {}
-            st.session_state.firma_likert = None
-            st.session_state.columnas_likert = []
-            st.session_state.modelo_entrenado = False
-            st.session_state.resultado_entrenamiento = None
-            st.session_state.pop("variable_perfil_resultados", None)
+        # La firma del filtro se guarda siempre, aunque el dataset no haya
+        # requerido limpieza. Así todas las vistas comparten la misma selección.
+        firma_anterior = st.session_state.get("firma_filtro_activo")
+        if firma_anterior is not None and firma_anterior != firma_filtro:
+            _invalidar_resultados_filtro()
+        st.session_state.firma_filtro_activo = firma_filtro
         if (
             st.session_state.get("filtro_calidad") == firma_filtro
             and st.session_state.get("resultado_limpieza") is not None
@@ -634,6 +942,7 @@ def renderizar_vista_datos() -> None:
         ):
             df_filtrado = st.session_state.dataset_limpio.copy()
         st.session_state.dataframe_filtrado = df_filtrado.copy()
+        st.session_state.indices_filas_filtradas = df_filtrado.index.tolist()
 
         nombre_archivo = escape(str(st.session_state.nombre_archivo or "Dataset sin nombre"))
         fecha_carga = escape(str(st.session_state.fecha_carga or "Sin fecha"))
@@ -685,3 +994,9 @@ def renderizar_vista_datos() -> None:
             )
 
         _renderizar_tabla_paginada(df_filtrado)
+
+    st.divider()
+    datos_originales = st.session_state.get("dataset_original")
+    if not isinstance(datos_originales, pd.DataFrame):
+        datos_originales = df_cargado
+    _renderizar_generador_sinteticos(datos_originales)

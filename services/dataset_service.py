@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from numbers import Real
 from typing import Final
 
+import numpy as np
 import pandas as pd
 
 
@@ -80,7 +81,7 @@ _VARIACIONES_LIKERT_A_NUMERO: Final[dict[int, tuple[str, ...]]] = {
 DIMENSIONES_BIG_FIVE: Final[dict[str, range]] = {
     "Extraversión": range(1, 6),
     "Estabilidad emocional": range(6, 11),
-    "Apertura": range(11, 16),
+    "Apertura a la experiencia": range(11, 16),
     "Responsabilidad": range(16, 21),
     "Amabilidad": range(21, 26),
 }
@@ -372,11 +373,63 @@ class ServicioConjuntoDatos:
         )
 
 
+def crear_perfiles_big_five(datos: pd.DataFrame) -> pd.DataFrame:
+    """Convierte las 25 respuestas de cada persona en sus cinco rasgos."""
+    return ServicioConjuntoDatos().preprocesar(datos).dimensiones.copy()
+
+
+def crear_perfiles_con_contexto(datos: pd.DataFrame) -> pd.DataFrame:
+    """Añade columnas auxiliares para filtrar sin incorporarlas a K-Means."""
+    preprocesado = ServicioConjuntoDatos().preprocesar(datos)
+    columnas_preguntas = set(preprocesado.columnas_preguntas)
+    columnas_contexto = [
+        columna for columna in datos.columns if columna not in columnas_preguntas
+    ]
+    contexto = datos.loc[:, columnas_contexto].copy()
+    return pd.concat([preprocesado.dimensiones.copy(), contexto], axis=1)
+
+
+def validar_perfiles_big_five(datos: pd.DataFrame) -> pd.DataFrame:
+    """Valida y ordena un dataset que ya contiene los cinco rasgos Big Five."""
+    if not isinstance(datos, pd.DataFrame):
+        raise TypeError("Los perfiles deben recibirse como un DataFrame de pandas.")
+    if datos.empty:
+        raise ErrorDatos("El conjunto de perfiles no contiene registros.")
+
+    columnas_esperadas = list(DIMENSIONES_BIG_FIVE)
+    faltantes = [columna for columna in columnas_esperadas if columna not in datos]
+    if faltantes:
+        raise ErrorDatos(
+            "Faltan dimensiones Big Five: " + ", ".join(faltantes) + "."
+        )
+
+    perfiles = datos.loc[:, columnas_esperadas].copy()
+    columnas_no_numericas = [
+        columna
+        for columna in columnas_esperadas
+        if not pd.api.types.is_numeric_dtype(perfiles[columna])
+    ]
+    if columnas_no_numericas:
+        raise ErrorDatos(
+            "Las dimensiones deben ser numéricas: "
+            + ", ".join(columnas_no_numericas)
+            + "."
+        )
+    if perfiles.isna().any().any():
+        raise ErrorDatos("Los perfiles Big Five contienen valores faltantes.")
+
+    perfiles = perfiles.astype(float)
+    if not np.isfinite(perfiles.to_numpy()).all():
+        raise ErrorDatos("Los perfiles Big Five contienen valores no válidos.")
+    if not perfiles.apply(lambda serie: serie.between(1, 5).all()).all():
+        raise ErrorDatos("Las dimensiones Big Five deben estar entre 1 y 5.")
+    return perfiles
+
+
 # ---------------------------------------------------------------------------
 # RF-05 a RF-08 — Diagnóstico de calidad y limpieza automática del dataset
 # ---------------------------------------------------------------------------
 
-import numpy as np
 from dataclasses import field
 
 

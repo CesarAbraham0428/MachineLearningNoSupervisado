@@ -15,6 +15,7 @@ from services.training_service import (
 )
 from services.model_service import ErrorModelo, ModeloGuardado, ServicioModelo
 from services.dataset_service import (
+    DIMENSIONES_BIG_FIVE,
     DiagnosticoCalidad,
     ETIQUETAS_LIKERT,
     ErrorDatos,
@@ -24,6 +25,7 @@ from services.dataset_service import (
     diagnosticar_calidad,
     limpiar_dataset,
     obtener_valor_likert,
+    validar_perfiles_big_five,
 )
 
 def _obtener_datos_preparados() -> pd.DataFrame | None:
@@ -280,32 +282,21 @@ def _renderizar_modelo_kmeans() -> None:
     """Guía la selección de variables, recomendación de K y entrenamiento."""
     st.subheader("Configuración de K-Means")
     st.caption(
-        "K-Means reúne registros con características parecidas. Utiliza la copia "
-        "numérica confirmada durante la preparación del dataset."
+        "K-Means reúne personas con perfiles parecidos utilizando exclusivamente "
+        "los cinco rasgos Big Five estandarizados."
     )
 
     datos_preparados = _obtener_datos_preparados()
     if datos_preparados is None:
         st.info(
-            "Aún no hay un dataset numérico preparado. Confirma la conversión "
-            "de las respuestas Likert para continuar con el entrenamiento."
+            "Aún no hay perfiles Big Five preparados para continuar con el entrenamiento."
         )
         return
 
-    columnas_numericas = datos_preparados.select_dtypes(include="number").columns.tolist()
-    columnas_no_numericas = [
-        str(columna)
-        for columna in datos_preparados.columns
-        if columna not in columnas_numericas
-    ]
-    if columnas_no_numericas:
-        st.warning(
-            "Estas columnas no numéricas no pueden utilizarse para formar grupos: "
-            + ", ".join(columnas_no_numericas)
-            + "."
-        )
-    if len(columnas_numericas) < 2:
-        st.error("Se requieren al menos dos columnas numéricas para entrenar.")
+    try:
+        datos_preparados = validar_perfiles_big_five(datos_preparados)
+    except (ErrorDatos, TypeError) as error:
+        st.error(f"Los perfiles no están listos para entrenar: {error}")
         return
 
     _renderizar_reutilizacion_modelos(datos_preparados, columnas_numericas)
@@ -315,16 +306,13 @@ def _renderizar_modelo_kmeans() -> None:
     resumen_centro.metric("Variables numéricas", len(columnas_numericas))
     resumen_derecha.metric("Origen", "Datos preparados")
 
-    columnas_seleccionadas = st.multiselect(
-        "Variables que formarán los clústeres",
-        options=columnas_numericas,
-        default=columnas_numericas,
-        key="columnas_entrenamiento",
-        help="Selecciona al menos dos variables. Fechas e identificadores deben excluirse.",
+    st.markdown("**Variables que formarán los clústeres**")
+    st.caption(
+        "El modelo utilizará conjuntamente los cinco rasgos Big Five: "
+        + ", ".join(columnas_numericas)
+        + "."
     )
-    if len(columnas_seleccionadas) < 2:
-        st.warning("Selecciona al menos dos variables para continuar.")
-        return
+    columnas_seleccionadas = columnas_numericas
 
     datos_modelo = datos_preparados.loc[:, columnas_seleccionadas]
     firma = _firma_datos(datos_modelo, columnas_seleccionadas)
@@ -466,16 +454,20 @@ def _renderizar_modelo_kmeans() -> None:
             st.error(str(error))
 
 def _obtener_datos_activos() -> pd.DataFrame | None:
-    """Obtiene el dataset activo (subconjunto filtrado, dataset limpio o dataset cargado)."""
-    dataframe_filtrado = st.session_state.get("dataframe_filtrado")
-    if dataframe_filtrado is not None:
-        return dataframe_filtrado
-
+    """Obtiene las cinco dimensiones y conserva cualquier filtro de filas."""
+    indices_filtrados = st.session_state.get("indices_filas_filtradas")
     dataset_limpio = st.session_state.get("dataset_limpio")
-    if dataset_limpio is not None:
-        return dataset_limpio
-
-    return st.session_state.get("dataframe_cargado")
+    base = (
+        dataset_limpio
+        if isinstance(dataset_limpio, pd.DataFrame)
+        else st.session_state.get("dataframe_cargado")
+    )
+    if not isinstance(base, pd.DataFrame):
+        return None
+    if indices_filtrados is not None:
+        indices = base.index.intersection(pd.Index(indices_filtrados))
+        return base.loc[indices].copy()
+    return base.copy()
 
 
 def _renderizar_fila_calidad(etiqueta: str, valor: str, clase_color: str = "") -> str:
@@ -628,6 +620,8 @@ def _limpiar_estado_preparacion_entrenamiento() -> None:
     st.session_state.firma_entrenamiento = None
     st.session_state.modelo_entrenado = False
     st.session_state.resultado_entrenamiento = None
+    st.session_state.pop("evaluaciones_k", None)
+    st.session_state.pop("firma_evaluaciones_k", None)
     st.session_state.pop("variable_perfil_resultados", None)
 
 
@@ -820,6 +814,44 @@ def _renderizar_configuracion_likert(
         st.rerun()
 
 
+def _renderizar_preparacion_perfiles(
+    df: pd.DataFrame,
+    firma_filtro: tuple[tuple[str, ...], str, str] | None,
+) -> None:
+    """Valida la matriz de cinco rasgos que consumirá K-Means."""
+    firma_datos = _firma_datos_likert(df, firma_filtro)
+    diagnostico = diagnosticar_calidad(df)
+    if diagnostico.requiere_limpieza:
+        with st.container(border=True, key="big-five-panel-bloqueado"):
+            st.subheader("Perfiles Big Five")
+            st.warning(
+                "Limpia primero los problemas de calidad para preparar los cinco "
+                "rasgos para el entrenamiento."
+            )
+        return
+
+    try:
+        perfiles = validar_perfiles_big_five(df)
+    except (ErrorDatos, TypeError) as error:
+        with st.container(border=True, key="big-five-panel-error"):
+            st.subheader("Perfiles Big Five")
+            st.error(str(error))
+        return
+
+    _guardar_dataframe_entrenamiento(perfiles, firma_datos)
+    with st.container(border=True, key="big-five-panel-listo"):
+        st.subheader("Perfiles Big Five")
+        st.success(
+            "Los 25 reactivos ya fueron resumidos en cinco dimensiones numéricas."
+        )
+        st.caption(
+            f"{len(perfiles):,} perfiles listos · "
+            + " · ".join(perfiles.columns)
+        )
+        with st.expander("Ver matriz de entrenamiento", expanded=False):
+            st.dataframe(perfiles, hide_index=True, width="stretch")
+
+
 def renderizar_vista_entrenamiento() -> None:
     """Renderiza la interfaz del entrenamiento del modelo."""
     # Garantizar que las claves de sesión existan aunque el usuario llegue
@@ -828,6 +860,8 @@ def renderizar_vista_entrenamiento() -> None:
         "dataframe_cargado": None,
         "dataset_limpio": None,
         "dataframe_filtrado": None,
+        "indices_filas_filtradas": None,
+        "firma_filtro_activo": None,
         "resultado_limpieza": None,
         "filtro_calidad": None,
         "dataset_likert": None,
@@ -853,7 +887,7 @@ def renderizar_vista_entrenamiento() -> None:
         )
         return
 
-    firma_filtro = st.session_state.get("filtro_calidad")
+    firma_filtro = st.session_state.get("firma_filtro_activo")
     renderizar_validacion_limpieza(df_activo, firma_filtro=firma_filtro)
 
     firma_datos = _firma_datos_likert(df_activo, firma_filtro)
@@ -866,7 +900,7 @@ def renderizar_vista_entrenamiento() -> None:
     ):
         _limpiar_estado_preparacion_entrenamiento()
 
-    _renderizar_configuracion_likert(df_activo, firma_filtro=firma_filtro)
+    _renderizar_preparacion_perfiles(df_activo, firma_filtro=firma_filtro)
 
     if st.session_state.get("dataframe_entrenamiento") is not None:
         st.divider()

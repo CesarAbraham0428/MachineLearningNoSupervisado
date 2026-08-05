@@ -1,4 +1,4 @@
-"""Cálculo de estadísticas descriptivas para el cuestionario Big Five."""
+"""Estadística descriptiva de perfiles Big Five de cinco dimensiones."""
 
 from __future__ import annotations
 
@@ -6,95 +6,57 @@ from dataclasses import dataclass
 
 import pandas as pd
 
-from services.dataset_service import ResultadoPreprocesamiento, ServicioConjuntoDatos
+from services.dataset_service import validar_perfiles_big_five
 
 
 @dataclass(frozen=True)
 class ResumenEstadistico:
-    """Datos calculados que consumen la vista y el reporte estadístico."""
+    """Datos descriptivos que consumen la vista y el reporte PDF."""
 
     cantidad_registros: int
     cantidad_variables: int
-    estadisticas_por_pregunta: pd.DataFrame
-    faltantes_por_pregunta: pd.Series
-    frecuencia_respuestas: pd.DataFrame
+    estadisticas_por_rasgo: pd.DataFrame
+    faltantes_por_rasgo: pd.Series
     promedio_dimensiones: pd.Series
-    respuestas_numericas: pd.DataFrame
     dimensiones_por_registro: pd.DataFrame
 
 
 class ServicioEstadisticas:
-    """Genera el resumen descriptivo requerido por RF-05."""
-
-    def __init__(self, servicio_datos: ServicioConjuntoDatos | None = None):
-        self._servicio_datos = servicio_datos or ServicioConjuntoDatos()
+    """Resume la matriz numérica de cinco rasgos Big Five."""
 
     @staticmethod
-    def _calcular_moda(respuestas: pd.DataFrame) -> pd.Series:
-        """Calcula la primera moda por pregunta de manera determinista."""
+    def _calcular_moda(perfiles: pd.DataFrame) -> pd.Series:
         modas = {}
-        for columna in respuestas.columns:
-            valores = respuestas[columna].mode(dropna=True)
+        for columna in perfiles.columns:
+            valores = perfiles[columna].mode(dropna=True)
             modas[columna] = valores.iloc[0] if not valores.empty else pd.NA
         return pd.Series(modas, name="Moda")
 
-    @staticmethod
-    def _crear_tabla_estadisticas(respuestas: pd.DataFrame) -> pd.DataFrame:
-        """Agrupa las medidas descriptivas relevantes por variable."""
+    @classmethod
+    def _crear_tabla_estadisticas(cls, perfiles: pd.DataFrame) -> pd.DataFrame:
         tabla = pd.DataFrame(
             {
-                "Media": respuestas.mean(),
-                "Mediana": respuestas.median(),
-                "Moda": ServicioEstadisticas._calcular_moda(respuestas),
-                "Desviación estándar": respuestas.std(ddof=1),
-                "Mínimo": respuestas.min(),
-                "Máximo": respuestas.max(),
+                "Media": perfiles.mean(),
+                "Mediana": perfiles.median(),
+                "Moda": cls._calcular_moda(perfiles),
+                "Desviación estándar": perfiles.std(ddof=1),
+                "Mínimo": perfiles.min(),
+                "Máximo": perfiles.max(),
             }
         )
-        tabla.index.name = "Pregunta"
+        tabla.index.name = "Rasgo"
         return tabla.round(2)
 
-    @staticmethod
-    def _calcular_frecuencias(respuestas: pd.DataFrame) -> pd.DataFrame:
-        """Cuenta respuestas Likert y muestra también el porcentaje global."""
-        conteos = (
-            respuestas.stack()
-            .value_counts()
-            .reindex(range(1, 6), fill_value=0)
-            .sort_index()
-        )
-        total = int(conteos.sum())
-        etiquetas = {
-            1: "Totalmente en desacuerdo",
-            2: "En desacuerdo",
-            3: "Neutral",
-            4: "De acuerdo",
-            5: "Totalmente de acuerdo",
-        }
-        frecuencia = pd.DataFrame(
-            {
-                "Valor Likert": conteos.index,
-                "Respuesta": [etiquetas[valor] for valor in conteos.index],
-                "Frecuencia": conteos.values,
-                "Porcentaje": (conteos.values / total * 100) if total else 0,
-            }
-        )
-        return frecuencia.round({"Porcentaje": 2})
-
     def calcular_resumen(self, datos: pd.DataFrame) -> ResumenEstadistico:
-        """Calcula todas las estadísticas del dataset antes del entrenamiento."""
-        preprocesado: ResultadoPreprocesamiento = self._servicio_datos.preprocesar(datos)
-        respuestas = preprocesado.respuestas_numericas
-
+        """Calcula estadísticas directamente sobre los cinco rasgos activos."""
+        perfiles = validar_perfiles_big_five(datos)
+        faltantes = perfiles.isna().sum()
+        faltantes.name = "Faltantes"
         return ResumenEstadistico(
-            cantidad_registros=len(respuestas),
-            cantidad_variables=len(respuestas.columns),
-            estadisticas_por_pregunta=self._crear_tabla_estadisticas(respuestas),
-            faltantes_por_pregunta=datos.loc[:, preprocesado.columnas_preguntas]
-            .isna()
-            .sum(),
-            frecuencia_respuestas=self._calcular_frecuencias(respuestas),
-            promedio_dimensiones=preprocesado.dimensiones.mean().round(2),
-            respuestas_numericas=respuestas,
-            dimensiones_por_registro=preprocesado.dimensiones,
+            cantidad_registros=len(perfiles),
+            cantidad_variables=len(perfiles.columns),
+            estadisticas_por_rasgo=self._crear_tabla_estadisticas(perfiles),
+            faltantes_por_rasgo=faltantes,
+            promedio_dimensiones=perfiles.mean().round(2),
+            dimensiones_por_registro=perfiles,
         )

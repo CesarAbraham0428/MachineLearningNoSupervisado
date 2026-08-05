@@ -5,6 +5,7 @@ import unittest
 import pandas as pd
 
 from services.report_service import ServicioReportes
+from services.dataset_service import crear_perfiles_big_five
 from services.statistics_service import ServicioEstadisticas
 from services.training_service import ServicioEntrenamiento
 
@@ -37,7 +38,9 @@ def _crear_dataset_entrenamiento() -> pd.DataFrame:
 
 class PruebasServicioReportes(unittest.TestCase):
     def test_genera_un_pdf_conteniendo_el_resumen_estadistico(self):
-        resumen = ServicioEstadisticas().calcular_resumen(_crear_dataset())
+        resumen = ServicioEstadisticas().calcular_resumen(
+            crear_perfiles_big_five(_crear_dataset())
+        )
 
         contenido = ServicioReportes().generar_reporte_estadistico(
             resumen, nombre_dataset="cuestionario_prueba.csv"

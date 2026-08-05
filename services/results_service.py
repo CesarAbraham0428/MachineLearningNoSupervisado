@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from numbers import Integral
 
 import pandas as pd
 from sklearn.decomposition import PCA
@@ -146,21 +147,61 @@ class ServicioResultados:
         return centros
 
     def crear_tabla_asignaciones(
-        self, resultado: ResultadoEntrenamiento
+        self,
+        resultado: ResultadoEntrenamiento,
+        datos_originales: pd.DataFrame | None = None,
     ) -> pd.DataFrame:
-        """Relaciona cada registro entrenado con el grupo encontrado."""
+        """Relaciona cada registro entrenado, sus valores y el grupo encontrado."""
         self._validar(resultado)
-        asignaciones = resultado.asignaciones.reindex(
-            resultado.datos_estandarizados.index
+        indices_entrenados = resultado.datos_estandarizados.index
+        asignaciones = resultado.asignaciones.reindex(indices_entrenados)
+        if asignaciones.isna().any():
+            raise ErrorResultados(
+                "Las asignaciones de grupo no coinciden con los registros entrenados."
+            )
+
+        identificadores = pd.Series(
+            [
+                f"Registro {int(indice) + 1}"
+                if isinstance(indice, Integral) and int(indice) >= 0
+                else str(indice)
+                for indice in indices_entrenados
+            ],
+            index=indices_entrenados,
+            name="Identificador",
         )
-        return pd.DataFrame(
-            {
-                "Registro": [
-                    f"Registro {posicion}"
-                    for posicion in range(1, len(asignaciones) + 1)
-                ],
-                "Grupo asignado": asignaciones.astype(int).map(
-                    lambda grupo: f"Grupo {grupo}"
-                ),
+        grupos = asignaciones.astype(int).map(lambda grupo: f"Grupo {grupo}")
+
+        if datos_originales is None:
+            return pd.DataFrame(
+                {
+                    "Identificador": identificadores.to_list(),
+                    "Grupo asignado": grupos.to_list(),
+                }
+            )
+        if not isinstance(datos_originales, pd.DataFrame):
+            raise TypeError("Los datos originales deben ser un DataFrame.")
+        if not datos_originales.index.is_unique:
+            raise ErrorResultados(
+                "Los datos originales contienen identificadores de fila repetidos."
+            )
+
+        indices_faltantes = indices_entrenados.difference(datos_originales.index)
+        if not indices_faltantes.empty:
+            raise ErrorResultados(
+                "No fue posible localizar todos los registros entrenados en los "
+                "datos cargados."
+            )
+
+        detalle = datos_originales.reindex(indices_entrenados).copy()
+        nombres_reservados = {"Identificador", "Grupo asignado"}
+        detalle = detalle.rename(
+            columns={
+                columna: f"{columna} (dato original)"
+                for columna in detalle.columns
+                if columna in nombres_reservados
             }
         )
+        detalle.insert(0, "Identificador", identificadores.to_list())
+        detalle["Grupo asignado"] = grupos.to_list()
+        return detalle.reset_index(drop=True)
