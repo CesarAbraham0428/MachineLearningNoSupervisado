@@ -604,7 +604,7 @@ def _renderizar_generador_sinteticos(datos_originales: pd.DataFrame) -> None:
     with st.container(border=True, key="synthetic-data-panel"):
         st.subheader("Generar perfiles Big Five sintéticos")
         st.caption(
-            "Para cada rasgo se calcula la media y desviación estándar de los "
+            "Para cada rasgo activo se calcula la media y desviación estándar de los "
             "perfiles originales y se generan valores normales entre 1 y 5."
         )
 
@@ -667,16 +667,17 @@ def _renderizar_generador_sinteticos(datos_originales: pd.DataFrame) -> None:
         metrica_final.metric("Archivo final", f"{len(datos_combinados):,}")
 
         st.caption(
-            "Vista previa: cada fila contiene solo los cinco rasgos. Las primeras "
+            "Vista previa: cada fila contiene solo los rasgos activos. Las primeras "
             "filas son sintéticas y las restantes corresponden a perfiles originales."
         )
         st.dataframe(datos_combinados.head(8), width="stretch", hide_index=True)
 
         with st.expander("Ver parámetros estimados desde los originales"):
+            originales_generados = datos_combinados.iloc[total_sinteticos:]
             parametros = pd.DataFrame(
                 {
-                    "Media": datos_originales.mean(),
-                    "Desviación estándar": datos_originales.std(ddof=1),
+                    "Media": originales_generados.mean(),
+                    "Desviación estándar": originales_generados.std(ddof=1),
                 }
             ).round(3)
             parametros.index.name = "Rasgo"
@@ -1027,7 +1028,4 @@ def renderizar_vista_datos() -> None:
         _renderizar_tabla_paginada(df_filtrado)
 
     st.divider()
-    datos_originales = st.session_state.get("dataset_original")
-    if not isinstance(datos_originales, pd.DataFrame):
-        datos_originales = df_cargado
-    _renderizar_generador_sinteticos(datos_originales)
+    _renderizar_generador_sinteticos(df_filtrado)

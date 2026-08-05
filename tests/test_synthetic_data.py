@@ -73,22 +73,5 @@ class PruebasGeneradorRespuestasLikert(unittest.TestCase):
             ],
         )
 
-    def test_repite_el_resultado_con_la_misma_semilla(self):
-        perfiles = [[3.2, 2.8, 4.0, 4.2, 3.6]] * 4
-
-        primero = GENERADOR.generar_respuestas_sinteticas(
-            perfiles,
-            self.originales,
-            semilla=15,
-        )
-        segundo = GENERADOR.generar_respuestas_sinteticas(
-            perfiles,
-            self.originales,
-            semilla=15,
-        )
-
-        self.assertEqual(primero, segundo)
-
-
 if __name__ == "__main__":
     unittest.main()

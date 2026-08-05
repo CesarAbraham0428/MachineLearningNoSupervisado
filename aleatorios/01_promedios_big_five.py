@@ -35,7 +35,6 @@ PREGUNTAS_POR_RASGO = 5
 PERFILES_SINTETICOS_ESPERADOS = 349
 VALOR_MINIMO = 1.0
 VALOR_MAXIMO = 5.0
-SEMILLA_ALEATORIA = 42
 
 VALORES_RESPUESTA = {
     "Totalmente en desacuerdo": 1,
@@ -193,11 +192,10 @@ def generar_valor_normal_limitado(
 def generar_perfiles_sinteticos(
     estadisticas: list[dict[str, object]],
     cantidad_perfiles: int = PERFILES_SINTETICOS_ESPERADOS,
-    semilla: int = SEMILLA_ALEATORIA,
 ) -> list[list[float]]:
     """Genera perfiles independientes con una normal por cada dimension."""
 
-    generador_aleatorio = random.Random(semilla)
+    generador_aleatorio = random.Random()
     perfiles: list[list[float]] = []
 
     for _ in range(cantidad_perfiles):

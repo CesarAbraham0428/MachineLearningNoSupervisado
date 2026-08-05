@@ -27,7 +27,7 @@ class PruebasServicioDatosSinteticos(unittest.TestCase):
         self.datos = _crear_perfiles()
 
     def test_combina_sinteticos_y_originales_con_solo_cinco_rasgos(self):
-        resultado = generar_dataset_sintetico(self.datos, cantidad=6, semilla=15)
+        resultado = generar_dataset_sintetico(self.datos, cantidad=6)
 
         self.assertEqual(resultado.datos_sinteticos.shape, (6, 5))
         self.assertEqual(resultado.datos_combinados.shape, (11, 5))
@@ -37,8 +37,27 @@ class PruebasServicioDatosSinteticos(unittest.TestCase):
             self.datos.reset_index(drop=True),
         )
 
+    def test_respeta_los_rasgos_activos_del_subconjunto(self):
+        columnas_activas = [
+            "Extraversión",
+            "Responsabilidad",
+            "Amabilidad",
+        ]
+        originales = self.datos.loc[:, columnas_activas]
+
+        resultado = generar_dataset_sintetico(originales, cantidad=6)
+
+        self.assertEqual(resultado.datos_sinteticos.shape, (6, 3))
+        self.assertEqual(resultado.datos_combinados.shape, (11, 3))
+        self.assertEqual(
+            resultado.datos_combinados.columns.tolist(), columnas_activas
+        )
+        pd.testing.assert_frame_equal(
+            resultado.datos_combinados.iloc[6:].reset_index(drop=True),
+            originales.reset_index(drop=True),
+        )
     def test_genera_valores_continuos_validos(self):
-        resultado = generar_dataset_sintetico(self.datos, cantidad=200, semilla=23)
+        resultado = generar_dataset_sintetico(self.datos, cantidad=200)
 
         self.assertTrue(
             resultado.datos_sinteticos.apply(lambda serie: serie.between(1, 5).all()).all()
@@ -50,13 +69,8 @@ class PruebasServicioDatosSinteticos(unittest.TestCase):
             )
         )
 
-    def test_es_reproducible_cuando_se_indica_semilla(self):
-        primero = generar_dataset_sintetico(self.datos, cantidad=20, semilla=7)
-        segundo = generar_dataset_sintetico(self.datos, cantidad=20, semilla=7)
-        pd.testing.assert_frame_equal(primero.datos_combinados, segundo.datos_combinados)
-
     def test_reporta_media_y_desviacion_muestral_originales(self):
-        resultado = generar_dataset_sintetico(self.datos, cantidad=10, semilla=11)
+        resultado = generar_dataset_sintetico(self.datos, cantidad=10)
         pd.testing.assert_series_equal(resultado.medias, self.datos.mean())
         pd.testing.assert_series_equal(resultado.desviaciones, self.datos.std(ddof=1))
 
@@ -64,7 +78,7 @@ class PruebasServicioDatosSinteticos(unittest.TestCase):
         constantes = pd.DataFrame(
             {columna: [3.0, 3.0, 3.0] for columna in DIMENSIONES_BIG_FIVE}
         )
-        resultado = generar_dataset_sintetico(constantes, cantidad=12, semilla=3)
+        resultado = generar_dataset_sintetico(constantes, cantidad=12)
         self.assertTrue((resultado.datos_sinteticos == 3.0).all().all())
 
     def test_rechaza_cantidades_no_positivas(self):

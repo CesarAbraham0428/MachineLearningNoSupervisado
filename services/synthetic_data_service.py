@@ -65,13 +65,13 @@ def _generar_dimension_normal_limitada(
 def generar_dataset_sintetico(
     datos_originales: pd.DataFrame,
     cantidad: int,
-    semilla: int | None = None,
 ) -> ResultadoDatosSinteticos:
     """Genera perfiles normales y los antepone a los perfiles originales.
 
-    La entrada ya debe representar a cada persona mediante las cinco dimensiones
-    Big Five. Cada dimensión sintética se genera con la media y desviación
-    estándar muestral observadas, conservando valores continuos entre 1 y 5.
+    La entrada debe representar a cada persona mediante al menos dos rasgos
+    Big Five activos. Cada dimensión sintética se genera con la media y
+    desviación estándar muestral observadas, conservando valores continuos
+    entre 1 y 5.
     """
     if isinstance(cantidad, bool) or not isinstance(cantidad, int) or cantidad < 1:
         raise ErrorDatosSinteticos(
@@ -79,7 +79,11 @@ def generar_dataset_sintetico(
         )
 
     try:
-        perfiles_originales = validar_perfiles_big_five(datos_originales)
+        perfiles_originales = validar_perfiles_big_five(
+            datos_originales,
+            permitir_subconjunto=True,
+            minimo_columnas=2,
+        )
     except ErrorDatos as error:
         raise ErrorDatosSinteticos(str(error)) from error
 
@@ -88,6 +92,7 @@ def generar_dataset_sintetico(
             "Se requieren al menos dos perfiles originales para calcular la desviación."
         )
 
+    # 1. Se obtienen parámetros de los datos reales
     medias = perfiles_originales.mean(axis=0)
     desviaciones = perfiles_originales.std(axis=0, ddof=1)
     if desviaciones.isna().any():
@@ -95,7 +100,8 @@ def generar_dataset_sintetico(
             "No fue posible calcular la desviación estándar de los rasgos."
         )
 
-    generador = np.random.default_rng(semilla)
+    # 2. Generación de perfiles sintéticos
+    generador = np.random.default_rng()
     sinteticos = pd.DataFrame(
         {
             columna: _generar_dimension_normal_limitada(
@@ -108,6 +114,7 @@ def generar_dataset_sintetico(
         }
     ).round(2)
     sinteticos = sinteticos.loc[:, perfiles_originales.columns]
+    #3 Unión con los datos originales
     combinados = pd.concat(
         [sinteticos, perfiles_originales.reset_index(drop=True)],
         ignore_index=True,

@@ -45,7 +45,6 @@ PREGUNTAS_POR_RASGO = 5
 CANTIDAD_RASGOS = 5
 CANTIDAD_PREGUNTAS = PREGUNTAS_POR_RASGO * CANTIDAD_RASGOS
 PERFILES_SINTETICOS_ESPERADOS = 349
-SEMILLA_ALEATORIA = 84
 
 NOMBRES_RASGOS = (
     "extraversion",
@@ -221,7 +220,6 @@ def _ajustar_promedio(
 def generar_respuestas_sinteticas(
     perfiles: Sequence[Sequence[float]],
     respuestas_originales: Sequence[Sequence[int]],
-    semilla: int = SEMILLA_ALEATORIA,
 ) -> list[list[int]]:
     """Convierte perfiles 5D en filas de 25 respuestas Likert numericas.
 
@@ -238,7 +236,7 @@ def generar_respuestas_sinteticas(
     if any(len(perfil) != CANTIDAD_RASGOS for perfil in perfiles):
         raise ValueError("Cada perfil sintetico debe contener cinco rasgos.")
 
-    generador = random.Random(semilla)
+    generador = random.Random()
     resultado: list[list[int]] = []
 
     for perfil in perfiles:

@@ -31,11 +31,7 @@ El archivo combinado contiene primero los registros sintéticos y después los o
 - Responsabilidad
 - Amabilidad
 
-Los originales no se alteran. La generación no selecciona una fila semilla, no busca perfiles lejanos y no fuerza subconjuntos o clústeres.
-
-## Reproducibilidad técnica
-
-La función admite opcionalmente un número `semilla` para que las pruebas automáticas puedan repetir exactamente una ejecución. No representa un perfil base y no es una opción expuesta en la interfaz.
+Los originales no se alteran. La generación no selecciona perfiles base, no busca perfiles lejanos y no fuerza subconjuntos o clústeres.
 
 ## Alcance e interpretación
 
