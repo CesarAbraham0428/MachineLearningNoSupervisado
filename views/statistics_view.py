@@ -6,6 +6,7 @@ from datetime import datetime
 
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
 
 from services.dataset_service import ErrorDatos
@@ -44,20 +45,87 @@ def _grafica_promedios(resumen: ResumenEstadistico):
     )
 
 
-def _grafica_histograma(resumen: ResumenEstadistico, rasgo: str):
-    datos = resumen.dimensiones_por_registro[[rasgo]].rename(columns={rasgo: "Valor"})
-    return px.histogram(
-        datos,
-        x="Valor",
-        nbins=20,
-        text_auto=True,
-        color_discrete_sequence=["#b876ff"],
+def _grafica_histograma(tabla_frecuencia: pd.DataFrame, rasgo: str):
+    datos = tabla_frecuencia.copy()
+    limites = (
+        datos["Intervalo"]
+        .str.extract(
+            r"^\[\s*([-+]?\d+(?:\.\d+)?)\s*-\s*([-+]?\d+(?:\.\d+)?)",
+            expand=True,
+        )
+        .astype(float)
+    )
+    datos["_limite_inferior"] = limites[0]
+    datos["_limite_superior"] = limites[1]
+    datos["_centro_intervalo"] = (
+        datos["_limite_inferior"] + datos["_limite_superior"]
+    ) / 2
+    datos["_ancho_intervalo"] = (
+        datos["_limite_superior"] - datos["_limite_inferior"]
+    )
+
+    titulo_eje_x = f"Puntaje del rasgo {rasgo.lower()}"
+    limites_eje_x = [
+        *datos["_limite_inferior"].tolist(),
+        float(datos["_limite_superior"].iloc[-1]),
+    ]
+    etiquetas_eje_x = [f"{limite:.2f}" for limite in limites_eje_x]
+
+    figura = go.Figure(
+        data=[
+            go.Bar(
+                x=datos["_centro_intervalo"],
+                y=datos["f"],
+                width=datos["_ancho_intervalo"],
+                text=datos["f"],
+                texttemplate="%{text}",
+                textposition="outside",
+                marker=dict(
+                    color="#b876ff",
+                    line=dict(color="#8a52c7", width=1),
+                ),
+                customdata=datos[
+                    ["Intervalo", "Marca de Clase", "Fr", "%"]
+                ].to_numpy(),
+                hovertemplate=(
+                    "Intervalo: %{customdata[0]}<br>"
+                    "Marca de Clase: %{customdata[1]:.2f}<br>"
+                    "Fr: %{customdata[2]:.4f}<br>"
+                    "%: %{customdata[3]:.2f}<br>"
+                    "frecuencia: %{y}<extra></extra>"
+                ),
+                showlegend=False,
+            ),
+            go.Scatter(
+                x=datos["_centro_intervalo"],
+                y=datos["f"],
+                mode="lines+markers",
+                name="Polígono de frecuencia",
+                line=dict(color="#4c286e", width=3),
+                marker=dict(
+                    size=8,
+                    color="#4c286e",
+                    line=dict(color="#ffffff", width=1.5),
+                ),
+                hovertemplate=(
+                    "Centro del intervalo: %{x:.2f}<br>"
+                    "frecuencia: %{y}<extra>Polígono de frecuencia</extra>"
+                ),
+                showlegend=False,
+            ),
+        ]
+    )
+    return figura.update_layout(
         title=f"Distribución de {rasgo}",
-        labels={"Valor": "Puntuación promedio (1 a 5)", "count": "Perfiles"},
-    ).update_layout(
-        bargap=0.08,
-        xaxis=dict(range=[1, 5], dtick=0.5),
-        yaxis_rangemode="tozero",
+        bargap=0,
+        xaxis=dict(
+            title=titulo_eje_x,
+            tickmode="array",
+            tickvals=limites_eje_x,
+            ticktext=etiquetas_eje_x,
+            range=[limites_eje_x[0], limites_eje_x[-1]],
+        ),
+        yaxis=dict(title="frecuencia", rangemode="tozero"),
         margin=dict(t=55, l=20, r=20, b=20),
     )
 
@@ -109,7 +177,16 @@ def renderizar_vista_estadisticas() -> None:
 
     _renderizar_tarjetas(resumen)
     st.subheader("Medidas estadísticas por rasgo")
-    st.dataframe(resumen.estadisticas_por_rasgo, width="stretch")
+    st.dataframe(
+        resumen.estadisticas_por_rasgo,
+        width="stretch",
+        column_config={
+            "Varianza": st.column_config.NumberColumn(format="%.2f"),
+            "Coeficiente de variación (%)": st.column_config.NumberColumn(
+                format="%.2f%%"
+            ),
+        },
+    )
 
     st.plotly_chart(_grafica_promedios(resumen), width="stretch")
 
@@ -119,4 +196,41 @@ def renderizar_vista_estadisticas() -> None:
         options=list(resumen.dimensiones_por_registro.columns),
         key="rasgo_histograma",
     )
-    st.plotly_chart(_grafica_histograma(resumen, rasgo), width="stretch")
+    valores_rasgo = resumen.dimensiones_por_registro[rasgo]
+    parametros = ServicioEstadisticas.calcular_parametros_intervalos(valores_rasgo)
+    tabla_frecuencia = ServicioEstadisticas.calcular_frecuencia_intervalos(
+        valores_rasgo,
+        parametros=parametros,
+    )
+    st.markdown(f"#### Tabla de frecuencia por intervalos — {rasgo}")
+    st.markdown(
+        f"**R** = máximo - mínimo = {parametros.maximo:.2f} - {parametros.minimo:.2f} "
+        f"= {parametros.rango:.2f}  \n"
+        f"**K** = 1 + 1.3322 × log(N) = 1 + 1.3322 × log({parametros.cantidad_datos}) "
+        f"= {parametros.k_formula:.2f} ≈ {parametros.k}  \n"
+        f"**A** = R / K = {parametros.rango:.2f} / {parametros.k} "
+        f"= {parametros.amplitud:.2f}"
+    )
+    rango, intervalos, amplitud = st.columns(3)
+    rango.metric("Rango (R)", f"{parametros.rango:.2f}")
+    intervalos.metric("K (intervalo)", f"{parametros.k}")
+    amplitud.metric("A (amplitud)", f"{parametros.amplitud:.2f}")
+    st.caption(
+        "f = frecuencia absoluta · Fr = frecuencia relativa (f/N) · % = Fr × 100 · "
+        "F = frecuencia absoluta acumulada."
+    )
+    tabla_mostrada = tabla_frecuencia.rename(columns={"Intervalo": rasgo})
+    st.dataframe(
+        tabla_mostrada,
+        width="stretch",
+        hide_index=True,
+        column_config={
+            rasgo: st.column_config.TextColumn(width="medium"),
+            "Marca de Clase": st.column_config.NumberColumn(format="%.2f"),
+            "f": st.column_config.NumberColumn(format="%d"),
+            "Fr": st.column_config.NumberColumn(format="%.4f"),
+            "%": st.column_config.NumberColumn(format="%.2f%%"),
+            "F": st.column_config.NumberColumn(format="%d"),
+        },
+    )
+    st.plotly_chart(_grafica_histograma(tabla_frecuencia, rasgo), width="stretch")
