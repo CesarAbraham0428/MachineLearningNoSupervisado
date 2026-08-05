@@ -223,3 +223,148 @@ class ServicioEntrenamiento:
             modelo=modelo,
             escalador=escalador,
         )
+
+    def _preparar_datos_compatibles(
+        self, datos: pd.DataFrame, columnas: tuple[str, ...]
+    ) -> pd.DataFrame:
+        """Selecciona y valida las variables que exige un modelo guardado."""
+        if not isinstance(datos, pd.DataFrame):
+            raise TypeError("Los datos deben ser un DataFrame.")
+
+        faltantes = [columna for columna in columnas if columna not in datos.columns]
+        if faltantes:
+            raise ErrorEntrenamiento(
+                "El dataset no contiene las variables requeridas por el modelo: "
+                + ", ".join(faltantes)
+                + "."
+            )
+        return self.validar_datos(datos.loc[:, list(columnas)])
+
+    def reutilizar_modelo(
+        self,
+        datos: pd.DataFrame,
+        columnas: tuple[str, ...],
+        modelo_previo: KMeans,
+        escalador_previo: StandardScaler,
+    ) -> ResultadoEntrenamiento:
+        """Aplica un modelo ya entrenado a un nuevo dataset compatible, sin reentrenar.
+
+        Usa el escalador y los centros guardados tal cual (solo se llama a
+        ``transform``/``predict``, nunca a ``fit``) para asignar cada nuevo
+        registro al grupo más cercano.
+        """
+        datos_validos = self._preparar_datos_compatibles(datos, columnas)
+        estandarizados = pd.DataFrame(
+            escalador_previo.transform(datos_validos),
+            index=datos_validos.index,
+            columns=datos_validos.columns,
+        )
+
+        etiquetas = modelo_previo.predict(estandarizados)
+        if len(np.unique(etiquetas)) < 2:
+            raise ErrorEntrenamiento(
+                "El modelo reutilizado no pudo separar los nuevos registros en "
+                "clústeres distintos."
+            )
+
+        centroides_estandarizados = pd.DataFrame(
+            modelo_previo.cluster_centers_, columns=estandarizados.columns
+        )
+        centroides_originales = pd.DataFrame(
+            escalador_previo.inverse_transform(modelo_previo.cluster_centers_),
+            columns=estandarizados.columns,
+        )
+        asignaciones = pd.Series(
+            etiquetas + 1, index=estandarizados.index, name="Cluster"
+        )
+        tamanos = asignaciones.value_counts().sort_index()
+        silhouette_final = silhouette_score(estandarizados, etiquetas)
+        inercia = float(-modelo_previo.score(estandarizados))
+
+        return ResultadoEntrenamiento(
+            columnas=tuple(map(str, estandarizados.columns)),
+            datos_estandarizados=estandarizados,
+            asignaciones=asignaciones,
+            tamanos_clusters=tamanos,
+            centroides_estandarizados=centroides_estandarizados,
+            centroides_originales=centroides_originales,
+            evaluaciones=(),
+            k_recomendado=int(modelo_previo.n_clusters),
+            k_usado=int(modelo_previo.n_clusters),
+            inercia=inercia,
+            silhouette=float(silhouette_final),
+            modelo=modelo_previo,
+            escalador=escalador_previo,
+        )
+
+    def continuar_entrenamiento(
+        self,
+        datos: pd.DataFrame,
+        columnas: tuple[str, ...],
+        modelo_previo: KMeans,
+        escalador_previo: StandardScaler,
+    ) -> ResultadoEntrenamiento:
+        """Reanuda el entrenamiento de un modelo guardado con un nuevo dataset.
+
+        K-Means no admite aprendizaje incremental, así que "continuar" se
+        implementa reentrenando con los centros previos como punto de
+        partida (``init``) en lugar de una inicialización aleatoria: el
+        modelo aprovecha lo aprendido antes y lo ajusta con los datos nuevos,
+        en vez de empezar desde cero. El escalador previo se conserva sin
+        reajustar para que los centros de partida sigan siendo válidos.
+        """
+        datos_validos = self._preparar_datos_compatibles(datos, columnas)
+        k = int(modelo_previo.n_clusters)
+        if len(datos_validos) <= k:
+            raise ErrorEntrenamiento(
+                "Se requieren más registros que grupos para continuar el "
+                "entrenamiento."
+            )
+
+        estandarizados = pd.DataFrame(
+            escalador_previo.transform(datos_validos),
+            index=datos_validos.index,
+            columns=datos_validos.columns,
+        )
+
+        modelo = KMeans(
+            n_clusters=k,
+            init=modelo_previo.cluster_centers_,
+            n_init=1,
+            random_state=self.random_state,
+        )
+        etiquetas = modelo.fit_predict(estandarizados)
+        if len(np.unique(etiquetas)) < 2:
+            raise ErrorEntrenamiento(
+                "No fue posible continuar el entrenamiento: los nuevos registros "
+                "no formaron clústeres distintos."
+            )
+
+        centroides_estandarizados = pd.DataFrame(
+            modelo.cluster_centers_, columns=estandarizados.columns
+        )
+        centroides_originales = pd.DataFrame(
+            escalador_previo.inverse_transform(modelo.cluster_centers_),
+            columns=estandarizados.columns,
+        )
+        asignaciones = pd.Series(
+            etiquetas + 1, index=estandarizados.index, name="Cluster"
+        )
+        tamanos = asignaciones.value_counts().sort_index()
+        silhouette_final = silhouette_score(estandarizados, etiquetas)
+
+        return ResultadoEntrenamiento(
+            columnas=tuple(map(str, estandarizados.columns)),
+            datos_estandarizados=estandarizados,
+            asignaciones=asignaciones,
+            tamanos_clusters=tamanos,
+            centroides_estandarizados=centroides_estandarizados,
+            centroides_originales=centroides_originales,
+            evaluaciones=(),
+            k_recomendado=k,
+            k_usado=k,
+            inercia=float(modelo.inertia_),
+            silhouette=float(silhouette_final),
+            modelo=modelo,
+            escalador=escalador_previo,
+        )

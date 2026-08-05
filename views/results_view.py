@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
@@ -10,6 +11,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from services.model_service import ErrorModelo, ServicioModelo
+from services.report_service import ServicioReportes
 from services.results_service import ErrorResultados, ServicioResultados
 from services.training_service import ResultadoEntrenamiento
 
@@ -290,6 +292,20 @@ def renderizar_vista_resultados() -> None:
         return
 
     with st.container(horizontal=True, horizontal_alignment="right"):
+        nombre_archivo = st.session_state.get("nombre_archivo") or "dataset.csv"
+        reporte_pdf = ServicioReportes().generar_reporte_entrenamiento(
+            resultado,
+            nombre_dataset=str(nombre_archivo),
+            fecha_generacion=datetime.now(),
+        )
+        st.download_button(
+            "Descargar PDF",
+            data=reporte_pdf,
+            file_name="reporte_resultados_entrenamiento.pdf",
+            mime="application/pdf",
+            key="descargar_reporte_entrenamiento",
+            icon=":material/picture_as_pdf:",
+        )
         if st.button(
             "Guardar modelo",
             type="primary",

@@ -66,6 +66,86 @@ class PruebasServicioEntrenamiento(unittest.TestCase):
         with self.assertRaisesRegex(ErrorEntrenamiento, "numéricas"):
             self.servicio.entrenar_modelo(datos)
 
+    def test_reutilizar_modelo_asigna_sin_reentrenar(self):
+        resultado = self.servicio.entrenar_modelo(_datos_de_prueba(), maximo_k=3)
+
+        datos_nuevos = pd.DataFrame(
+            {
+                "Extraversión": [1.05, 0.95, 4.85, 4.95],
+                "Responsabilidad": [1.0, 1.05, 4.85, 4.9],
+            }
+        )
+        reutilizado = self.servicio.reutilizar_modelo(
+            datos_nuevos,
+            resultado.columnas,
+            resultado.modelo,
+            resultado.escalador,
+        )
+
+        self.assertIs(reutilizado.modelo, resultado.modelo)
+        self.assertIs(reutilizado.escalador, resultado.escalador)
+        self.assertEqual(len(reutilizado.asignaciones), 4)
+        self.assertEqual(reutilizado.k_usado, resultado.k_usado)
+        self.assertTrue(
+            (
+                reutilizado.centroides_estandarizados.values
+                == resultado.centroides_estandarizados.values
+            ).all()
+        )
+
+    def test_reutilizar_modelo_rechaza_columnas_faltantes(self):
+        resultado = self.servicio.entrenar_modelo(_datos_de_prueba(), maximo_k=3)
+        datos_incompatibles = pd.DataFrame({"Otra columna": [1, 2, 3, 4]})
+
+        with self.assertRaisesRegex(ErrorEntrenamiento, "variables requeridas"):
+            self.servicio.reutilizar_modelo(
+                datos_incompatibles,
+                resultado.columnas,
+                resultado.modelo,
+                resultado.escalador,
+            )
+
+    def test_continuar_entrenamiento_parte_de_los_centros_previos(self):
+        resultado = self.servicio.entrenar_modelo(_datos_de_prueba(), maximo_k=3)
+
+        datos_nuevos = pd.DataFrame(
+            {
+                "Extraversión": [1.1, 0.9, 1.0, 4.9, 5.1, 4.8],
+                "Responsabilidad": [1.0, 1.1, 0.95, 4.95, 4.85, 5.0],
+            }
+        )
+        continuado = self.servicio.continuar_entrenamiento(
+            datos_nuevos,
+            resultado.columnas,
+            resultado.modelo,
+            resultado.escalador,
+        )
+
+        self.assertIsNot(continuado.modelo, resultado.modelo)
+        self.assertIs(continuado.escalador, resultado.escalador)
+        self.assertEqual(len(continuado.asignaciones), 6)
+        self.assertEqual(continuado.k_usado, resultado.k_usado)
+        self.assertGreater(continuado.silhouette, 0.0)
+
+    def test_continuar_entrenamiento_requiere_mas_registros_que_grupos(self):
+        resultado = self.servicio.entrenar_modelo(
+            _datos_de_prueba(), k=3, maximo_k=3
+        )
+        datos_insuficientes = pd.DataFrame(
+            {
+                "Extraversión": [1.0, 1.1, 4.9],
+                "Responsabilidad": [1.1, 1.0, 4.8],
+            }
+        )
+
+        with self.assertRaisesRegex(ErrorEntrenamiento, "más registros"):
+            self.servicio.continuar_entrenamiento(
+                datos_insuficientes,
+                resultado.columnas,
+                resultado.modelo,
+                resultado.escalador,
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

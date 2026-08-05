@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
+import json
 import sqlite3
-from typing import Callable
+from typing import Callable, Iterable
 from uuid import uuid4
 
 import joblib
@@ -42,6 +43,7 @@ class ModeloGuardado:
     silhouette: float
     dataset_origen: str
     archivo: str
+    columnas: tuple[str, ...] = field(default_factory=tuple)
 
 
 class ServicioModelo:
@@ -95,6 +97,17 @@ class ServicioModelo:
                     )
                     """
                 )
+                columnas_existentes = {
+                    str(fila[1])
+                    for fila in conexion.execute("PRAGMA table_info(modelos_guardados)")
+                }
+                if "columnas" not in columnas_existentes:
+                    # Migración: los modelos guardados antes de esta versión no
+                    # registran sus variables; quedan con '[]' y no se ofrecen
+                    # como compatibles hasta que se vuelvan a guardar.
+                    conexion.execute(
+                        "ALTER TABLE modelos_guardados ADD COLUMN columnas TEXT NOT NULL DEFAULT '[]'"
+                    )
         except sqlite3.Error as error:
             raise ErrorModelo(
                 "No fue posible preparar el catálogo de modelos guardados."
@@ -111,6 +124,10 @@ class ServicioModelo:
 
     @staticmethod
     def _desde_fila(fila: sqlite3.Row) -> ModeloGuardado:
+        try:
+            columnas = tuple(json.loads(fila["columnas"]))
+        except (KeyError, IndexError, TypeError, ValueError, json.JSONDecodeError):
+            columnas = ()
         return ModeloGuardado(
             id=int(fila["id"]),
             nombre=str(fila["nombre"]),
@@ -123,6 +140,7 @@ class ServicioModelo:
             silhouette=float(fila["silhouette"]),
             dataset_origen=str(fila["dataset_origen"]),
             archivo=str(fila["archivo"]),
+            columnas=columnas,
         )
 
     def guardar_modelo(
@@ -187,9 +205,10 @@ class ServicioModelo:
                         cantidad_grupos,
                         silhouette,
                         dataset_origen,
-                        archivo
+                        archivo,
+                        columnas
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         nombre_limpio,
@@ -202,6 +221,7 @@ class ServicioModelo:
                         resultado.silhouette,
                         dataset_limpio,
                         nombre_archivo,
+                        json.dumps(list(resultado.columnas)),
                     ),
                 )
                 modelo_id = int(cursor.lastrowid)
@@ -228,6 +248,7 @@ class ServicioModelo:
             silhouette=float(resultado.silhouette),
             dataset_origen=dataset_limpio,
             archivo=nombre_archivo,
+            columnas=tuple(resultado.columnas),
         )
 
     def listar_modelos(self) -> list[ModeloGuardado]:
@@ -248,7 +269,8 @@ class ServicioModelo:
                         cantidad_grupos,
                         silhouette,
                         dataset_origen,
-                        archivo
+                        archivo,
+                        columnas
                     FROM modelos_guardados
                     ORDER BY fecha_creacion DESC, id DESC
                     """
@@ -256,6 +278,24 @@ class ServicioModelo:
         except sqlite3.Error as error:
             raise ErrorModelo("No fue posible consultar los modelos guardados.") from error
         return [self._desde_fila(fila) for fila in filas]
+
+    def listar_modelos_compatibles(
+        self, columnas_disponibles: Iterable[str]
+    ) -> list[ModeloGuardado]:
+        """Filtra el catálogo a los modelos cuyas variables existen en el dataset activo.
+
+        Un modelo se considera compatible cuando todas las variables con las
+        que fue entrenado están presentes (por nombre) entre las columnas
+        numéricas disponibles del nuevo conjunto de datos. Los modelos
+        guardados antes de registrar esta información no se consideran
+        compatibles hasta que se vuelvan a guardar.
+        """
+        disponibles = {str(columna) for columna in columnas_disponibles}
+        return [
+            modelo
+            for modelo in self.listar_modelos()
+            if modelo.columnas and set(modelo.columnas).issubset(disponibles)
+        ]
 
     def contar_modelos(self) -> int:
         """Cuenta los modelos registrados sin cargar sus archivos."""
