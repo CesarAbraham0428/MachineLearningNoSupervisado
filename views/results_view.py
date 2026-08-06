@@ -160,6 +160,81 @@ def _grafica_pca(proyeccion):
     figura.update_layout(margin=dict(t=15, l=20, r=20, b=20))
     return figura
 
+def _color_con_opacidad(color: str, opacidad: float) -> str:
+    """Convierte un color hexadecimal en RGBA para el relleno del radar."""
+    rojo = int(color[1:3], 16)
+    verde = int(color[3:5], 16)
+    azul = int(color[5:7], 16)
+    return f"rgba({rojo}, {verde}, {azul}, {opacidad})"
+
+
+def _etiqueta_rasgo(columna: object) -> str:
+    """Acorta nombres largos de rasgos sin cambiar los datos originales."""
+    nombre = str(columna).strip()
+    nombres_cortos = {
+        "apertura a la experiencia": "Apertura",
+        "estabilidad emocional": "Estabilidad emocional",
+    }
+    return nombres_cortos.get(nombre.casefold(), nombre)
+
+
+def _indice_color_grupo(grupo: object) -> int:
+    """Obtiene un color estable a partir del número visible del grupo."""
+    try:
+        return max(0, int(str(grupo).rsplit(" ", 1)[-1]) - 1)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _grafica_pentagono(centro: pd.Series, variables: list[str]):
+    """Representa los cinco valores del grupo seleccionado en un radar."""
+    variables_visibles = [_etiqueta_rasgo(variable) for variable in variables]
+    ejes_cerrados = variables_visibles + [variables_visibles[0]]
+    figura = go.Figure()
+
+    grupo = str(centro["Grupo"])
+    indice_color = _indice_color_grupo(grupo)
+    color = _COLORES_GRUPOS[indice_color % len(_COLORES_GRUPOS)]
+    valores = [float(centro[variable]) for variable in variables]
+    figura.add_trace(
+        go.Scatterpolar(
+            r=valores + [valores[0]],
+            theta=ejes_cerrados,
+            name=grupo,
+            mode="lines+markers",
+            line=dict(color=color, width=3),
+            marker=dict(color=color, size=7),
+            fill="toself",
+            fillcolor=_color_con_opacidad(color, 0.22),
+            hovertemplate=(
+                f"{grupo}<br>%{{theta}}: %{{r:.2f}}<extra></extra>"
+            ),
+        )
+    )
+
+    figura.update_layout(
+        polar=dict(
+            bgcolor="rgba(0, 0, 0, 0)",
+            radialaxis=dict(
+                visible=True,
+                range=[1, 5],
+                tickvals=[1, 2, 3, 4, 5],
+                gridcolor="#d8e0e8",
+                linecolor="#aeb9c5",
+                tickfont=dict(size=11),
+            ),
+            angularaxis=dict(
+                gridcolor="#b8c3ce",
+                linecolor="#8d9aa8",
+                tickfont=dict(size=12),
+            ),
+        ),
+        showlegend=False,
+        margin=dict(t=20, l=35, r=35, b=35),
+        height=520,
+    )
+    return figura
+
 
 def _grafica_perfil(centros: pd.DataFrame, variable: str):
     """Compara el valor representativo de una variable entre grupos."""
@@ -365,6 +440,38 @@ def renderizar_vista_resultados() -> None:
                 f"Esta vista 2D resume {varianza_total:.1%} de la información "
                 "utilizada por el modelo. PCA solo se usa para visualizar."
             )
+    st.subheader("Pentágono de rasgos por grupo")
+    st.caption(
+        "Selecciona un grupo para consultar su perfil. Los vértices muestran "
+        "el valor promedio del grupo en cada uno de los cinco rasgos."
+    )
+    if len(resultado.columnas) == 5:
+        grupos_disponibles = centros["Grupo"].astype(str).tolist()
+        clave_grupo = "grupo_pentagono_resultados"
+        if st.session_state.get(clave_grupo) not in grupos_disponibles:
+            st.session_state[clave_grupo] = grupos_disponibles[0]
+
+        grupo_seleccionado = st.selectbox(
+            "Grupo a visualizar",
+            options=grupos_disponibles,
+            key=clave_grupo,
+            help="El pentágono se actualiza para mostrar únicamente este grupo.",
+        )
+        centro_seleccionado = centros.loc[
+            centros["Grupo"].astype(str).eq(grupo_seleccionado)
+        ].iloc[0]
+        st.plotly_chart(
+            _grafica_pentagono(
+                centro_seleccionado,
+                list(resultado.columnas),
+            ),
+            width="stretch",
+        )
+    else:
+        st.info(
+            "El pentágono se muestra cuando el modelo fue entrenado con "
+            "exactamente cinco variables."
+        )
 
     st.subheader("Perfil de los grupos")
     st.caption(
