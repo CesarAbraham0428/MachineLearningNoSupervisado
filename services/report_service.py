@@ -295,7 +295,7 @@ class ServicioReportes:
         return etiqueta if len(etiqueta) <= 25 else f"{etiqueta[:22]}..."
 
     @classmethod
-    def _grafica_pentagono_grupo(
+    def _grafica_radar_grupo(
         cls,
         centro: pd.Series,
         variables: list[str],
@@ -303,9 +303,9 @@ class ServicioReportes:
         ancho: float = 340,
         alto: float = 245,
     ) -> Drawing:
-        """Dibuja el perfil de cinco rasgos de un grupo en escala de 1 a 5."""
-        if len(variables) != 5:
-            raise ValueError("El pentágono requiere exactamente cinco variables.")
+        """Dibuja el perfil de tres o más rasgos de un grupo en escala de 1 a 5."""
+        if len(variables) < 3:
+            raise ValueError("El radar requiere al menos tres variables.")
 
         dibujo = Drawing(ancho, alto)
         centro_x = ancho / 2
@@ -320,7 +320,10 @@ class ServicioReportes:
             0.78 + (0.22 * color.green),
             0.78 + (0.22 * color.blue),
         )
-        angulos = [(2 * pi * indice / 5) for indice in range(5)]
+        angulos = [
+            (2 * pi * indice / len(variables))
+            for indice in range(len(variables))
+        ]
 
         dibujo.add(
             String(
@@ -431,14 +434,155 @@ class ServicioReportes:
         return dibujo
 
     @classmethod
-    def _pentagonos_grupos(
+    def _grafica_pentagono_grupo(
+        cls,
+        centro: pd.Series,
+        variables: list[str],
+        indice_color: int,
+        ancho: float = 340,
+        alto: float = 245,
+    ) -> Drawing:
+        """Conserva el pentágono para los perfiles de exactamente cinco rasgos."""
+        if len(variables) != 5:
+            raise ValueError("El pentágono requiere exactamente cinco variables.")
+        return cls._grafica_radar_grupo(
+            centro,
+            variables,
+            indice_color,
+            ancho,
+            alto,
+        )
+
+    @classmethod
+    def _grafica_barras_rasgos_grupo(
+        cls,
+        centro: pd.Series,
+        variables: list[str],
+        indice_color: int,
+        ancho: float = 340,
+        alto: float = 185,
+    ) -> Drawing:
+        """Compara dos rasgos con barras para evitar un radar degenerado."""
+        if len(variables) != 2:
+            raise ValueError("Las barras de perfil requieren exactamente dos variables.")
+
+        dibujo = Drawing(ancho, alto)
+        color = colors.HexColor(
+            cls._COLORES_GRUPOS[indice_color % len(cls._COLORES_GRUPOS)]
+        )
+        eje_x = 118
+        eje_y = 38
+        eje_ancho = ancho - eje_x - 28
+        eje_alto = 91
+
+        dibujo.add(
+            String(
+                ancho / 2,
+                alto - 13,
+                str(centro["Grupo"]),
+                fontName="Helvetica-Bold",
+                fontSize=11,
+                fillColor=cls._TINTA,
+                textAnchor="middle",
+            )
+        )
+        for nivel in range(1, 6):
+            x = eje_x + (eje_ancho * (nivel - 1) / 4)
+            dibujo.add(
+                Line(
+                    x,
+                    eje_y,
+                    x,
+                    eje_y + eje_alto,
+                    strokeColor=colors.HexColor("#D8E0E8"),
+                    strokeWidth=0.5,
+                )
+            )
+            dibujo.add(
+                String(
+                    x,
+                    eje_y - 13,
+                    str(nivel),
+                    fontName="Helvetica",
+                    fontSize=6.5,
+                    fillColor=cls._GRIS,
+                    textAnchor="middle",
+                )
+            )
+
+        for indice, variable in enumerate(variables):
+            y = eje_y + eje_alto - 29 - (indice * 47)
+            valor = min(5.0, max(1.0, float(centro[variable])))
+            ancho_barra = eje_ancho * ((valor - 1) / 4)
+            dibujo.add(
+                String(
+                    eje_x - 8,
+                    y + 7,
+                    cls._etiqueta_rasgo_pentagono(variable),
+                    fontName="Helvetica",
+                    fontSize=6.5,
+                    fillColor=cls._GRIS,
+                    textAnchor="end",
+                )
+            )
+            dibujo.add(
+                Rect(
+                    eje_x,
+                    y,
+                    ancho_barra,
+                    20,
+                    fillColor=color,
+                    strokeColor=color,
+                    strokeWidth=0,
+                )
+            )
+            texto_dentro = valor >= 4.55
+            dibujo.add(
+                String(
+                    eje_x + ancho_barra - 4 if texto_dentro else eje_x + ancho_barra + 4,
+                    y + 6.5,
+                    f"{valor:.2f}",
+                    fontName="Helvetica-Bold",
+                    fontSize=7,
+                    fillColor=colors.white if texto_dentro else cls._TINTA,
+                    textAnchor="end" if texto_dentro else "start",
+                )
+            )
+        return dibujo
+
+    @classmethod
+    def _grafica_perfil_rasgos_grupo(
+        cls,
+        centro: pd.Series,
+        variables: list[str],
+        indice_color: int,
+    ) -> Drawing:
+        """Elige el formato de perfil adecuado para las variables disponibles."""
+        if len(variables) == 2:
+            return cls._grafica_barras_rasgos_grupo(
+                centro,
+                variables,
+                indice_color,
+            )
+        if len(variables) == 5:
+            return cls._grafica_pentagono_grupo(
+                centro,
+                variables,
+                indice_color,
+            )
+        return cls._grafica_radar_grupo(centro, variables, indice_color)
+
+    @classmethod
+    def _perfiles_rasgos_grupos(
         cls,
         centros: pd.DataFrame,
         variables: list[str],
     ) -> Table:
-        """Organiza los radares de todos los grupos en dos columnas."""
+        """Organiza los perfiles de todos los grupos en dos columnas."""
+        if len(variables) < 2:
+            raise ValueError("El perfil requiere al menos dos variables.")
         graficas = [
-            cls._grafica_pentagono_grupo(fila, variables, indice)
+            cls._grafica_perfil_rasgos_grupo(fila, variables, indice)
             for indice, (_, fila) in enumerate(centros.iterrows())
         ]
         filas = [
@@ -460,6 +604,17 @@ class ServicioReportes:
             )
         )
         return tabla
+
+    @classmethod
+    def _pentagonos_grupos(
+        cls,
+        centros: pd.DataFrame,
+        variables: list[str],
+    ) -> Table:
+        """Conserva el punto de entrada histórico para los perfiles de cinco rasgos."""
+        if len(variables) != 5:
+            raise ValueError("Los pentágonos requieren exactamente cinco variables.")
+        return cls._perfiles_rasgos_grupos(centros, variables)
 
     @classmethod
     def _tarjetas(cls, indicadores: list[tuple[str, str, colors.Color]]) -> Table:
@@ -1211,10 +1366,22 @@ class ServicioReportes:
         servicio_resultados = ServicioResultados()
         resumen_grupos = servicio_resultados.crear_resumen_grupos(resultado)
         centros = servicio_resultados.crear_tabla_centros(resultado)
+        variables = list(resultado.columnas)
         interpretaciones = servicio_resultados.crear_interpretaciones_grupos(
             resultado
         )
         perfiles = servicio_resultados.crear_resumen_perfiles_grupos(resultado)
+
+        descripcion_perfil_rasgos = (
+            "Cada gráfica compara los dos rasgos seleccionados mediante barras "
+            "horizontales, sobre una escala de 1 a 5."
+            if len(variables) == 2
+            else (
+                f"Cada gráfica muestra un radar de {len(variables)} vértices; "
+                "cada vértice representa el valor del grupo en un rasgo, sobre "
+                "una escala de 1 a 5."
+            )
+        )
 
         fecha = fecha_generacion or datetime.now()
         estilos = self._estilos()
@@ -1305,21 +1472,11 @@ class ServicioReportes:
                 Spacer(1, 6),
                 self._tabla_centros_entrenamiento(centros, estilos),
                 PageBreak(),
-                *(
-                    [
-                        Paragraph("Pentágono de rasgos por grupo", estilos["seccion"]),
-                        Paragraph(
-                            "Cada gráfica muestra el valor representativo del grupo "
-                            "en los cinco rasgos, sobre una escala de 1 a 5.",
-                            estilos["cuerpo"],
-                        ),
-                        Spacer(1, 6),
-                        self._pentagonos_grupos(centros, list(resultado.columnas)),
-                        PageBreak(),
-                    ]
-                    if len(resultado.columnas) == 5
-                    else []
-                ),
+                Paragraph("Perfil de rasgos por grupo", estilos["seccion"]),
+                Paragraph(descripcion_perfil_rasgos, estilos["cuerpo"]),
+                Spacer(1, 6),
+                self._perfiles_rasgos_grupos(centros, variables),
+                PageBreak(),
                 Paragraph("Perfil e interpretación por rasgo de los grupos", estilos["seccion"]),
                 *self._parrafos_interpretaciones_grupos(interpretaciones, perfiles, estilos),
                 PageBreak(),

@@ -141,8 +141,8 @@ def _indice_color_grupo(grupo: object) -> int:
         return 0
 
 
-def _grafica_pentagono(centro: pd.Series, variables: list[str]):
-    """Representa los cinco valores del grupo seleccionado en un radar."""
+def _grafica_radar_rasgos(centro: pd.Series, variables: list[str]):
+    """Representa de tres a cinco valores del grupo seleccionado en un radar."""
     variables_visibles = [_etiqueta_rasgo(variable) for variable in variables]
     ejes_cerrados = variables_visibles + [variables_visibles[0]]
     figura = go.Figure()
@@ -189,6 +189,52 @@ def _grafica_pentagono(centro: pd.Series, variables: list[str]):
         height=520,
     )
     return figura
+
+
+def _grafica_barras_rasgos(centro: pd.Series, variables: list[str]):
+    """Representa dos rasgos sin deformarlos en un radar de solo dos ejes."""
+    grupo = str(centro["Grupo"])
+    indice_color = _indice_color_grupo(grupo)
+    color = _COLORES_GRUPOS[indice_color % len(_COLORES_GRUPOS)]
+    variables_visibles = [_etiqueta_rasgo(variable) for variable in variables]
+    valores = [float(centro[variable]) for variable in variables]
+
+    figura = go.Figure(
+        go.Bar(
+            x=valores,
+            y=variables_visibles,
+            orientation="h",
+            name=grupo,
+            marker=dict(color=color),
+            text=valores,
+            texttemplate="%{text:.2f}",
+            textposition="auto",
+            hovertemplate=(
+                f"{grupo}<br>%{{y}}: %{{x:.2f}}<extra></extra>"
+            ),
+        )
+    )
+    figura.update_layout(
+        showlegend=False,
+        xaxis=dict(
+            title="Valor promedio del grupo",
+            range=[1, 5],
+            tickvals=[1, 2, 3, 4, 5],
+            gridcolor="#d8e0e8",
+            rangemode="tozero",
+        ),
+        yaxis=dict(autorange="reversed"),
+        margin=dict(t=20, l=20, r=20, b=20),
+        height=300,
+    )
+    return figura
+
+
+def _grafica_rasgos(centro: pd.Series, variables: list[str]):
+    """Elige una visualización legible según la cantidad de rasgos."""
+    if len(variables) == 2:
+        return _grafica_barras_rasgos(centro, variables)
+    return _grafica_radar_rasgos(centro, variables)
 
 
 def _grafica_perfil(centros: pd.DataFrame, variable: str):
@@ -379,38 +425,44 @@ def renderizar_vista_resultados() -> None:
         st.caption("Cantidad de registros asignados a cada grupo.")
         st.plotly_chart(_grafica_distribucion(resumen), width="stretch")
 
-    st.subheader("Pentágono de rasgos por grupo")
+    st.subheader("Perfil de rasgos por grupo")
     st.caption(
-        "Selecciona un grupo para consultar su perfil. Los vértices muestran "
-        "el valor promedio del grupo en cada uno de los cinco rasgos."
+        "Selecciona un grupo para consultar su perfil en las dimensiones usadas "
+        "durante el entrenamiento."
     )
-    if len(resultado.columnas) == 5:
-        grupos_disponibles = centros["Grupo"].astype(str).tolist()
-        clave_grupo = "grupo_pentagono_resultados"
-        if st.session_state.get(clave_grupo) not in grupos_disponibles:
-            st.session_state[clave_grupo] = grupos_disponibles[0]
-
-        grupo_seleccionado = st.selectbox(
-            "Grupo a visualizar",
-            options=grupos_disponibles,
-            key=clave_grupo,
-            help="El pentágono se actualiza para mostrar únicamente este grupo.",
-        )
-        centro_seleccionado = centros.loc[
-            centros["Grupo"].astype(str).eq(grupo_seleccionado)
-        ].iloc[0]
-        st.plotly_chart(
-            _grafica_pentagono(
-                centro_seleccionado,
-                list(resultado.columnas),
-            ),
-            width="stretch",
+    cantidad_dimensiones = len(resultado.columnas)
+    if cantidad_dimensiones == 2:
+        st.caption(
+            "Con dos dimensiones se usan barras para evitar que un radar se "
+            "reduzca a una línea."
         )
     else:
-        st.info(
-            "El pentágono se muestra cuando el modelo fue entrenado con "
-            "exactamente cinco variables."
+        st.caption(
+            f"El radar forma una figura de {cantidad_dimensiones} vértices; "
+            "cada vértice representa el valor promedio de un rasgo."
         )
+
+    grupos_disponibles = centros["Grupo"].astype(str).tolist()
+    clave_grupo = "grupo_perfil_rasgos_resultados"
+    if st.session_state.get(clave_grupo) not in grupos_disponibles:
+        st.session_state[clave_grupo] = grupos_disponibles[0]
+
+    grupo_seleccionado = st.selectbox(
+        "Grupo a visualizar",
+        options=grupos_disponibles,
+        key=clave_grupo,
+        help="La gráfica se actualiza para mostrar únicamente este grupo.",
+    )
+    centro_seleccionado = centros.loc[
+        centros["Grupo"].astype(str).eq(grupo_seleccionado)
+    ].iloc[0]
+    st.plotly_chart(
+        _grafica_rasgos(
+            centro_seleccionado,
+            list(resultado.columnas),
+        ),
+        width="stretch",
+    )
 
     st.subheader("Perfil de los grupos")
     st.caption(

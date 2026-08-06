@@ -140,6 +140,48 @@ class PruebasServicioReportes(unittest.TestCase):
         self.assertTrue(contenido.startswith(b"%PDF"))
         self.assertEqual(pentagonos.call_count, resultado.k_usado)
 
+    def test_reporte_incluye_barras_por_grupo_con_dos_variables(self):
+        resultado = ServicioEntrenamiento(random_state=7).entrenar_modelo(
+            _crear_dataset_entrenamiento(), maximo_k=2
+        )
+
+        crear_barras = ServicioReportes._grafica_barras_rasgos_grupo
+        with patch.object(
+            ServicioReportes,
+            "_grafica_barras_rasgos_grupo",
+            wraps=crear_barras,
+        ) as barras:
+            contenido = ServicioReportes().generar_reporte_entrenamiento(resultado)
+
+        self.assertTrue(contenido.startswith(b"%PDF"))
+        self.assertEqual(barras.call_count, resultado.k_usado)
+
+    def test_reporte_incluye_radar_para_tres_y_cuatro_variables(self):
+        for cantidad_variables in (3, 4):
+            with self.subTest(cantidad_variables=cantidad_variables):
+                datos = pd.DataFrame(
+                    {
+                        f"Rasgo {indice}": [1.0, 1.2, 0.9, 4.8, 5.0, 4.9]
+                        for indice in range(1, cantidad_variables + 1)
+                    }
+                )
+                resultado = ServicioEntrenamiento(random_state=7).entrenar_modelo(
+                    datos, maximo_k=2
+                )
+
+                crear_radar = ServicioReportes._grafica_radar_grupo
+                with patch.object(
+                    ServicioReportes,
+                    "_grafica_radar_grupo",
+                    wraps=crear_radar,
+                ) as radar:
+                    contenido = ServicioReportes().generar_reporte_entrenamiento(
+                        resultado
+                    )
+
+                self.assertTrue(contenido.startswith(b"%PDF"))
+                self.assertEqual(radar.call_count, resultado.k_usado)
+
     def test_pentagonos_se_organizan_en_tabla_y_contienen_el_perfil(self):
         centros = pd.DataFrame(
             [
