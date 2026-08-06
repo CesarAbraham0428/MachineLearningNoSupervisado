@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from io import BytesIO
-from math import ceil
+from math import ceil, cos, pi, sin
 from pathlib import Path
 from xml.sax.saxutils import escape
 
@@ -25,7 +25,15 @@ from reportlab.platypus import (
 from reportlab.graphics.charts.barcharts import VerticalBarChart
 from reportlab.graphics.charts.piecharts import Pie
 from reportlab.graphics.charts.textlabels import Label
-from reportlab.graphics.shapes import Circle, Drawing, Line, PolyLine, Rect, String
+from reportlab.graphics.shapes import (
+    Circle,
+    Drawing,
+    Line,
+    Polygon,
+    PolyLine,
+    Rect,
+    String,
+)
 
 import pandas as pd
 
@@ -45,6 +53,16 @@ class ServicioReportes:
     _TINTA = colors.HexColor("#2B2622")
     _GRIS = colors.HexColor("#6E5C50")
     _FONDO_TABLA = colors.HexColor("#F4E8D9")
+    _COLORES_GRUPOS = (
+        "#2388ff",
+        "#43d78a",
+        "#b06df5",
+        "#f59e2f",
+        "#ef5576",
+        "#22b8cf",
+        "#f4c95d",
+        "#8b9a77",
+    )
 
     @staticmethod
     def _estilos() -> dict[str, ParagraphStyle]:
@@ -264,6 +282,184 @@ class ServicioReportes:
             pastel.slices[indice].fontSize = 7
         dibujo.add(pastel)
         return dibujo
+
+    @staticmethod
+    def _etiqueta_rasgo_pentagono(variable: object) -> str:
+        """Acorta las etiquetas del radar para conservar una lectura limpia."""
+        nombre = str(variable).strip()
+        nombres_cortos = {
+            "apertura a la experiencia": "Apertura",
+            "estabilidad emocional": "Estabilidad emocional",
+        }
+        etiqueta = nombres_cortos.get(nombre.casefold(), nombre)
+        return etiqueta if len(etiqueta) <= 25 else f"{etiqueta[:22]}..."
+
+    @classmethod
+    def _grafica_pentagono_grupo(
+        cls,
+        centro: pd.Series,
+        variables: list[str],
+        indice_color: int,
+        ancho: float = 340,
+        alto: float = 245,
+    ) -> Drawing:
+        """Dibuja el perfil de cinco rasgos de un grupo en escala de 1 a 5."""
+        if len(variables) != 5:
+            raise ValueError("El pentágono requiere exactamente cinco variables.")
+
+        dibujo = Drawing(ancho, alto)
+        centro_x = ancho / 2
+        centro_y = 108
+        radio = 72
+        radio_etiquetas = 94
+        color = colors.HexColor(
+            cls._COLORES_GRUPOS[indice_color % len(cls._COLORES_GRUPOS)]
+        )
+        relleno = colors.Color(
+            0.78 + (0.22 * color.red),
+            0.78 + (0.22 * color.green),
+            0.78 + (0.22 * color.blue),
+        )
+        angulos = [(2 * pi * indice / 5) for indice in range(5)]
+
+        dibujo.add(
+            String(
+                centro_x,
+                alto - 13,
+                str(centro["Grupo"]),
+                fontName="Helvetica-Bold",
+                fontSize=11,
+                fillColor=cls._TINTA,
+                textAnchor="middle",
+            )
+        )
+
+        for nivel in range(2, 6):
+            radio_nivel = radio * ((nivel - 1) / 4)
+            puntos_nivel: list[float] = []
+            for angulo in angulos:
+                puntos_nivel.extend(
+                    [
+                        centro_x + radio_nivel * cos(angulo),
+                        centro_y + radio_nivel * sin(angulo),
+                    ]
+                )
+            dibujo.add(
+                Polygon(
+                    puntos_nivel,
+                    fillColor=None,
+                    strokeColor=colors.HexColor("#D8E0E8"),
+                    strokeWidth=0.5,
+                )
+            )
+
+        for angulo in angulos:
+            dibujo.add(
+                Line(
+                    centro_x,
+                    centro_y,
+                    centro_x + radio * cos(angulo),
+                    centro_y + radio * sin(angulo),
+                    strokeColor=colors.HexColor("#B8C3CE"),
+                    strokeWidth=0.55,
+                )
+            )
+
+        for nivel in range(1, 6):
+            x = centro_x + radio * ((nivel - 1) / 4)
+            dibujo.add(
+                String(
+                    x,
+                    centro_y - 10,
+                    str(nivel),
+                    fontName="Helvetica",
+                    fontSize=6.5,
+                    fillColor=cls._GRIS,
+                    textAnchor="middle",
+                )
+            )
+
+        puntos_perfil: list[float] = []
+        for variable, angulo in zip(variables, angulos, strict=True):
+            valor = min(5.0, max(1.0, float(centro[variable])))
+            radio_valor = radio * ((valor - 1) / 4)
+            puntos_perfil.extend(
+                [
+                    centro_x + radio_valor * cos(angulo),
+                    centro_y + radio_valor * sin(angulo),
+                ]
+            )
+        dibujo.add(
+            Polygon(
+                puntos_perfil,
+                fillColor=relleno,
+                strokeColor=color,
+                strokeWidth=2.2,
+            )
+        )
+        for indice in range(0, len(puntos_perfil), 2):
+            dibujo.add(
+                Circle(
+                    puntos_perfil[indice],
+                    puntos_perfil[indice + 1],
+                    2.5,
+                    fillColor=color,
+                    strokeColor=color,
+                )
+            )
+
+        for variable, angulo in zip(variables, angulos, strict=True):
+            x = centro_x + radio_etiquetas * cos(angulo)
+            y = centro_y + radio_etiquetas * sin(angulo) - 2
+            coseno = cos(angulo)
+            ancla = (
+                "start"
+                if coseno > 0.35
+                else "end" if coseno < -0.35 else "middle"
+            )
+            dibujo.add(
+                String(
+                    x,
+                    y,
+                    cls._etiqueta_rasgo_pentagono(variable),
+                    fontName="Helvetica",
+                    fontSize=7,
+                    fillColor=cls._GRIS,
+                    textAnchor=ancla,
+                )
+            )
+        return dibujo
+
+    @classmethod
+    def _pentagonos_grupos(
+        cls,
+        centros: pd.DataFrame,
+        variables: list[str],
+    ) -> Table:
+        """Organiza los radares de todos los grupos en dos columnas."""
+        graficas = [
+            cls._grafica_pentagono_grupo(fila, variables, indice)
+            for indice, (_, fila) in enumerate(centros.iterrows())
+        ]
+        filas = [
+            graficas[indice : indice + 2]
+            for indice in range(0, len(graficas), 2)
+        ]
+        if filas and len(filas[-1]) == 1:
+            filas[-1].append("")
+        tabla = Table(filas, colWidths=[3.75 * inch, 3.75 * inch], hAlign="LEFT")
+        tabla.setStyle(
+            TableStyle(
+                [
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                    ("TOPPADDING", (0, 0), (-1, -1), 0),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                ]
+            )
+        )
+        return tabla
 
     @classmethod
     def _tarjetas(cls, indicadores: list[tuple[str, str, colors.Color]]) -> Table:
@@ -1109,6 +1305,21 @@ class ServicioReportes:
                 Spacer(1, 6),
                 self._tabla_centros_entrenamiento(centros, estilos),
                 PageBreak(),
+                *(
+                    [
+                        Paragraph("Pentágono de rasgos por grupo", estilos["seccion"]),
+                        Paragraph(
+                            "Cada gráfica muestra el valor representativo del grupo "
+                            "en los cinco rasgos, sobre una escala de 1 a 5.",
+                            estilos["cuerpo"],
+                        ),
+                        Spacer(1, 6),
+                        self._pentagonos_grupos(centros, list(resultado.columnas)),
+                        PageBreak(),
+                    ]
+                    if len(resultado.columnas) == 5
+                    else []
+                ),
                 Paragraph("Perfil e interpretación por rasgo de los grupos", estilos["seccion"]),
                 *self._parrafos_interpretaciones_grupos(interpretaciones, perfiles, estilos),
                 PageBreak(),

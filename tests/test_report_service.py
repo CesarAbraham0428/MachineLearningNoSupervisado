@@ -5,8 +5,8 @@ from dataclasses import replace
 from unittest.mock import patch
 
 import pandas as pd
-from reportlab.graphics.shapes import Rect, String
-from reportlab.platypus import Paragraph
+from reportlab.graphics.shapes import Polygon, Rect, String
+from reportlab.platypus import Paragraph, Table
 
 from services.report_service import ServicioReportes
 from services.dataset_service import crear_perfiles_big_five
@@ -114,6 +114,54 @@ class PruebasServicioReportes(unittest.TestCase):
         self.assertTrue(contenido.startswith(b"%PDF"))
         self.assertGreater(len(contenido), 5_000)
         self.assertEqual(interpretaciones_pdf.call_count, 1)
+
+    def test_reporte_incluye_un_pentagono_por_grupo_con_cinco_variables(self):
+        datos = pd.DataFrame(
+            {
+                "Extraversión": [1.0, 1.2, 1.1, 4.8, 5.0, 4.9],
+                "Estabilidad emocional": [1.2, 1.0, 1.1, 4.9, 4.7, 5.0],
+                "Apertura a la experiencia": [1.1, 1.3, 1.0, 4.7, 4.9, 4.8],
+                "Responsabilidad": [1.0, 1.1, 1.2, 5.0, 4.8, 4.9],
+                "Amabilidad": [1.3, 1.1, 1.2, 4.8, 5.0, 4.7],
+            }
+        )
+        resultado = ServicioEntrenamiento(random_state=7).entrenar_modelo(
+            datos, maximo_k=2
+        )
+
+        crear_pentagono = ServicioReportes._grafica_pentagono_grupo
+        with patch.object(
+            ServicioReportes,
+            "_grafica_pentagono_grupo",
+            wraps=crear_pentagono,
+        ) as pentagonos:
+            contenido = ServicioReportes().generar_reporte_entrenamiento(resultado)
+
+        self.assertTrue(contenido.startswith(b"%PDF"))
+        self.assertEqual(pentagonos.call_count, resultado.k_usado)
+
+    def test_pentagonos_se_organizan_en_tabla_y_contienen_el_perfil(self):
+        centros = pd.DataFrame(
+            [
+                {
+                    "Grupo": "Grupo 1",
+                    "Extraversión": 2.4,
+                    "Estabilidad emocional": 3.2,
+                    "Apertura a la experiencia": 3.0,
+                    "Responsabilidad": 4.0,
+                    "Amabilidad": 4.1,
+                }
+            ]
+        )
+        variables = [columna for columna in centros.columns if columna != "Grupo"]
+
+        tabla = ServicioReportes._pentagonos_grupos(centros, variables)
+        dibujo = tabla._cellvalues[0][0]
+
+        self.assertIsInstance(tabla, Table)
+        self.assertTrue(
+            any(isinstance(elemento, Polygon) for elemento in dibujo.contents)
+        )
 
     def test_reporte_de_entrenamiento_rechaza_tipos_invalidos(self):
         with self.assertRaises(TypeError):
