@@ -13,6 +13,7 @@ from services.dataset_service import (
     ErrorDatos,
     crear_perfiles_big_five,
     crear_perfiles_con_contexto,
+    validar_perfiles_big_five,
 )
 from services.synthetic_data_service import (
     ErrorDatosSinteticos,
@@ -371,6 +372,35 @@ def _cargar_archivo(archivo_subido) -> tuple[pd.DataFrame | None, str]:
 
 
 
+
+def _preparar_perfiles_archivo(
+    datos: pd.DataFrame,
+) -> tuple[pd.DataFrame, pd.DataFrame, bool]:
+    """Acepta cuestionarios de 25 preguntas o perfiles Big Five ya calculados."""
+    columnas_big_five = list(DIMENSIONES_BIG_FIVE)
+    rasgos_disponibles = [
+        columna for columna in columnas_big_five if columna in datos.columns
+    ]
+    es_perfil_big_five = len(rasgos_disponibles) >= 2
+    if es_perfil_big_five:
+        perfiles = validar_perfiles_big_five(
+            datos,
+            permitir_subconjunto=True,
+            minimo_columnas=2,
+        )
+        columnas_contexto = [
+            columna for columna in datos.columns if columna not in columnas_big_five
+        ]
+        contexto = datos.loc[:, columnas_contexto].reset_index(drop=True)
+        perfiles_con_contexto = pd.concat(
+            [perfiles.reset_index(drop=True), contexto], axis=1
+        )
+        return perfiles, perfiles_con_contexto, True
+
+    perfiles = crear_perfiles_big_five(datos)
+    perfiles_con_contexto = crear_perfiles_con_contexto(datos)
+    return perfiles, perfiles_con_contexto, False
+
 def _exportar_excel(df: pd.DataFrame) -> bytes:
     """Serializa el DataFrame en un buffer Excel."""
     buffer = io.BytesIO()
@@ -442,8 +472,11 @@ def _renderizar_carga() -> None:
             return
 
         try:
-            perfiles_big_five = crear_perfiles_big_five(df_nuevo)
-            perfiles_con_contexto = crear_perfiles_con_contexto(df_nuevo)
+            (
+                perfiles_big_five,
+                perfiles_con_contexto,
+                ya_es_perfil_big_five,
+            ) = _preparar_perfiles_archivo(df_nuevo)
         except (ErrorDatos, TypeError) as error:
             st.error(
                 "El archivo no pudo transformarse a perfiles Big Five: " + str(error)
@@ -486,7 +519,12 @@ def _renderizar_carga() -> None:
         _limpiar_resultado_sintetico()
         st.session_state["sel_columna_filtro"] = _SIN_FILTRO
         st.session_state["sel_valor_filtro"] = _TODOS
-        st.toast("Dataset convertido correctamente a cinco rasgos Big Five")
+        mensaje = (
+            "Dataset Big Five cargado directamente"
+            if ya_es_perfil_big_five
+            else "Dataset convertido correctamente a cinco rasgos Big Five"
+        )
+        st.toast(mensaje)
         st.rerun()
 
 

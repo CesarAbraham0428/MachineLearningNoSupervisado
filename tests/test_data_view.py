@@ -10,6 +10,7 @@ from views.data_view import (
     _detectar_columnas_temporales,
     _etiqueta_columna,
     _obtener_subconjunto,
+    _preparar_perfiles_archivo,
 )
 
 
@@ -55,5 +56,22 @@ class PruebasFiltrosVistaDatos(unittest.TestCase):
         self.assertEqual(resultado["Respuesta"].tolist(), ["A", "B", "C"])
 
 
+
+    def test_acepta_subconjuntos_big_five_ya_exportados(self):
+        datos = pd.DataFrame(
+            {
+                "Estabilidad emocional": [2.8, 3.4],
+                "Apertura a la experiencia": [4.0, 3.7],
+                "Responsabilidad": [3.6, 4.2],
+            }
+        )
+
+        perfiles, perfiles_con_contexto, ya_calculados = _preparar_perfiles_archivo(
+            datos
+        )
+
+        self.assertTrue(ya_calculados)
+        pd.testing.assert_frame_equal(perfiles, datos)
+        pd.testing.assert_frame_equal(perfiles_con_contexto, datos)
 if __name__ == "__main__":
     unittest.main()
