@@ -66,15 +66,6 @@ def _dialogo_guardar_modelo(resultado: ResultadoEntrenamiento) -> None:
             max_chars=100,
             help="Este nombre aparecerá en la pestaña Modelos guardados.",
         )
-        categoria = st.text_input(
-            "Categoría o propósito",
-            value=nombre_base,
-            max_chars=100,
-            help=(
-                "Describe para qué se utilizará, por ejemplo: Personalidad, "
-                "Clientes o Encuesta académica."
-            ),
-        )
         guardar = st.form_submit_button(
             "Guardar modelo",
             type="primary",
@@ -90,7 +81,6 @@ def _dialogo_guardar_modelo(resultado: ResultadoEntrenamiento) -> None:
         modelo_guardado = ServicioModelo().guardar_modelo(
             resultado,
             nombre=nombre,
-            categoria=categoria,
             dataset_origen=nombre_archivo,
             mapeo_likert=st.session_state.get("mapeo_likert", {}),
             columnas_likert=st.session_state.get("columnas_likert", []),
@@ -124,41 +114,6 @@ def _grafica_distribucion(resumen: pd.DataFrame):
     )
     return figura
 
-
-def _grafica_pca(proyeccion):
-    """Representa registros y centros de grupo en dos dimensiones."""
-    varianza_1, varianza_2 = proyeccion.varianza_explicada
-    figura = px.scatter(
-        proyeccion.puntos,
-        x="Componente 1",
-        y="Componente 2",
-        color="Grupo",
-        hover_name="Registro",
-        color_discrete_sequence=_COLORES_GRUPOS,
-        labels={
-            "Componente 1": f"Componente 1 ({varianza_1:.1%})",
-            "Componente 2": f"Componente 2 ({varianza_2:.1%})",
-        },
-    )
-    figura.update_traces(marker=dict(size=9, opacity=0.78))
-    figura.add_trace(
-        go.Scatter(
-            x=proyeccion.centros["Componente 1"],
-            y=proyeccion.centros["Componente 2"],
-            mode="markers",
-            name="Centro de cada grupo",
-            text=proyeccion.centros["Grupo"],
-            hovertemplate="%{text}<br>Centro del grupo<extra></extra>",
-            marker=dict(
-                symbol="x",
-                size=16,
-                color="#ffffff",
-                line=dict(width=2, color="#0f172a"),
-            ),
-        )
-    )
-    figura.update_layout(margin=dict(t=15, l=20, r=20, b=20))
-    return figura
 
 def _color_con_opacidad(color: str, opacidad: float) -> str:
     """Convierte un color hexadecimal en RGBA para el relleno del radar."""
@@ -396,7 +351,6 @@ def renderizar_vista_resultados() -> None:
     servicio = ServicioResultados()
     try:
         resumen = servicio.crear_resumen_grupos(resultado)
-        proyeccion = servicio.crear_proyeccion_pca(resultado)
         centros = servicio.crear_tabla_centros(resultado)
         interpretaciones = servicio.crear_interpretaciones_grupos(resultado)
         perfiles = servicio.crear_resumen_perfiles_grupos(resultado)
@@ -420,26 +374,11 @@ def renderizar_vista_resultados() -> None:
     _mostrar_lectura_silhouette(resultado)
     _mostrar_contexto_resultado(resultado)
 
-    columna_distribucion, columna_pca = st.columns([1, 1.65])
-    with columna_distribucion:
-        with st.container(border=True):
-            st.subheader("Tamaño de los grupos")
-            st.caption("Cantidad de registros asignados a cada grupo.")
-            st.plotly_chart(_grafica_distribucion(resumen), width="stretch")
+    with st.container(border=True):
+        st.subheader("Tamaño de los grupos")
+        st.caption("Cantidad de registros asignados a cada grupo.")
+        st.plotly_chart(_grafica_distribucion(resumen), width="stretch")
 
-    with columna_pca:
-        with st.container(border=True):
-            st.subheader("Mapa de similitud de los registros")
-            st.caption(
-                "Cada punto representa un registro; los puntos cercanos tienen "
-                "respuestas parecidas. La X marca el centro de cada grupo."
-            )
-            st.plotly_chart(_grafica_pca(proyeccion), width="stretch")
-            varianza_total = sum(proyeccion.varianza_explicada)
-            st.caption(
-                f"Esta vista 2D resume {varianza_total:.1%} de la información "
-                "utilizada por el modelo. PCA solo se usa para visualizar."
-            )
     st.subheader("Pentágono de rasgos por grupo")
     st.caption(
         "Selecciona un grupo para consultar su perfil. Los vértices muestran "

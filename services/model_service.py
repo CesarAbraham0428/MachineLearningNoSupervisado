@@ -34,8 +34,8 @@ class ModeloGuardado:
 
     id: int
     nombre: str
-    categoria: str
     fecha_creacion: datetime
+    fecha_modificacion: datetime
     cantidad_registros: int
     cantidad_variables: int
     algoritmo: str
@@ -85,8 +85,8 @@ class ServicioModelo:
                     CREATE TABLE IF NOT EXISTS modelos_guardados (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         nombre TEXT NOT NULL COLLATE NOCASE UNIQUE,
-                        categoria TEXT NOT NULL,
                         fecha_creacion TEXT NOT NULL,
+                        fecha_modificacion TEXT NOT NULL,
                         cantidad_registros INTEGER NOT NULL,
                         cantidad_variables INTEGER NOT NULL,
                         algoritmo TEXT NOT NULL,
@@ -107,6 +107,21 @@ class ServicioModelo:
                     # como compatibles hasta que se vuelvan a guardar.
                     conexion.execute(
                         "ALTER TABLE modelos_guardados ADD COLUMN columnas TEXT NOT NULL DEFAULT '[]'"
+                    )
+                if "fecha_modificacion" not in columnas_existentes:
+                    conexion.execute(
+                        "ALTER TABLE modelos_guardados ADD COLUMN fecha_modificacion TEXT"
+                    )
+                    conexion.execute(
+                        """
+                        UPDATE modelos_guardados
+                        SET fecha_modificacion = fecha_creacion
+                        WHERE fecha_modificacion IS NULL
+                        """
+                    )
+                if "categoria" in columnas_existentes:
+                    conexion.execute(
+                        "ALTER TABLE modelos_guardados DROP COLUMN categoria"
                     )
         except sqlite3.Error as error:
             raise ErrorModelo(
@@ -131,8 +146,10 @@ class ServicioModelo:
         return ModeloGuardado(
             id=int(fila["id"]),
             nombre=str(fila["nombre"]),
-            categoria=str(fila["categoria"]),
             fecha_creacion=datetime.fromisoformat(str(fila["fecha_creacion"])),
+            fecha_modificacion=datetime.fromisoformat(
+                str(fila["fecha_modificacion"])
+            ),
             cantidad_registros=int(fila["cantidad_registros"]),
             cantidad_variables=int(fila["cantidad_variables"]),
             algoritmo=str(fila["algoritmo"]),
@@ -148,7 +165,6 @@ class ServicioModelo:
         resultado: ResultadoEntrenamiento,
         *,
         nombre: str,
-        categoria: str,
         dataset_origen: str = "Dataset sin nombre",
         mapeo_likert: dict[str, int] | None = None,
         columnas_likert: list[str] | tuple[str, ...] | None = None,
@@ -158,7 +174,6 @@ class ServicioModelo:
             raise ErrorModelo("No hay un modelo entrenado válido para guardar.")
 
         nombre_limpio = self._validar_texto(nombre, "El nombre")
-        categoria_limpia = self._validar_texto(categoria, "La categoría")
         dataset_limpio = self._validar_texto(
             dataset_origen,
             "El dataset de origen",
@@ -177,8 +192,8 @@ class ServicioModelo:
             "columnas": tuple(resultado.columnas),
             "cantidad_grupos": resultado.k_usado,
             "fecha_creacion": fecha_creacion.isoformat(),
+            "fecha_modificacion": fecha_creacion.isoformat(),
             "dataset_origen": dataset_limpio,
-            "categoria": categoria_limpia,
             "mapeo_likert": dict(mapeo_likert or {}),
             "columnas_likert": tuple(columnas_likert or ()),
         }
@@ -197,8 +212,8 @@ class ServicioModelo:
                     """
                     INSERT INTO modelos_guardados (
                         nombre,
-                        categoria,
                         fecha_creacion,
+                        fecha_modificacion,
                         cantidad_registros,
                         cantidad_variables,
                         algoritmo,
@@ -212,7 +227,7 @@ class ServicioModelo:
                     """,
                     (
                         nombre_limpio,
-                        categoria_limpia,
+                        fecha_creacion.isoformat(),
                         fecha_creacion.isoformat(),
                         len(resultado.asignaciones),
                         len(resultado.columnas),
@@ -239,8 +254,8 @@ class ServicioModelo:
         return ModeloGuardado(
             id=modelo_id,
             nombre=nombre_limpio,
-            categoria=categoria_limpia,
             fecha_creacion=fecha_creacion,
+            fecha_modificacion=fecha_creacion,
             cantidad_registros=len(resultado.asignaciones),
             cantidad_variables=len(resultado.columnas),
             algoritmo="K-Means",
@@ -261,8 +276,8 @@ class ServicioModelo:
                     SELECT
                         id,
                         nombre,
-                        categoria,
                         fecha_creacion,
+                        fecha_modificacion,
                         cantidad_registros,
                         cantidad_variables,
                         algoritmo,
@@ -278,6 +293,112 @@ class ServicioModelo:
         except sqlite3.Error as error:
             raise ErrorModelo("No fue posible consultar los modelos guardados.") from error
         return [self._desde_fila(fila) for fila in filas]
+
+    def actualizar_modelo_reentrenado(
+        self, modelo_id: int, resultado: ResultadoEntrenamiento
+    ) -> ModeloGuardado:
+        """Reemplaza un modelo guardado y registra cuándo fue reentrenado."""
+        if not isinstance(resultado, ResultadoEntrenamiento):
+            raise ErrorModelo("No hay un modelo reentrenado válido para actualizar.")
+
+        try:
+            identificador = int(modelo_id)
+        except (TypeError, ValueError) as error:
+            raise ErrorModelo("No fue posible localizar el modelo solicitado.") from error
+
+        try:
+            with self._conexion() as conexion:
+                conexion.row_factory = sqlite3.Row
+                fila = conexion.execute(
+                    "SELECT * FROM modelos_guardados WHERE id = ?", (identificador,)
+                ).fetchone()
+        except sqlite3.Error as error:
+            raise ErrorModelo("No fue posible localizar el modelo solicitado.") from error
+
+        if fila is None:
+            raise ErrorModelo("El modelo solicitado no existe.")
+
+        ruta_anterior = self.directorio_modelos / str(fila["archivo"])
+        if not ruta_anterior.is_file():
+            raise ErrorModelo("El archivo asociado al modelo ya no está disponible.")
+
+        try:
+            artefacto = joblib.load(ruta_anterior)
+        except Exception as error:
+            raise ErrorModelo("El archivo del modelo no pudo abrirse.") from error
+        if not isinstance(artefacto, dict):
+            raise ErrorModelo("El archivo del modelo no tiene un formato compatible.")
+
+        fecha_modificacion = self.reloj().astimezone().replace(microsecond=0)
+        artefacto_actualizado = dict(artefacto)
+        artefacto_actualizado.update(
+            {
+                "modelo": resultado.modelo,
+                "escalador": resultado.escalador,
+                "columnas": tuple(resultado.columnas),
+                "cantidad_grupos": resultado.k_usado,
+                "fecha_modificacion": fecha_modificacion.isoformat(),
+            }
+        )
+
+        nombre_archivo = f"{uuid4().hex}.joblib"
+        ruta_nueva = self.directorio_modelos / nombre_archivo
+        ruta_temporal = self.directorio_modelos / f".{nombre_archivo}.tmp"
+        try:
+            joblib.dump(artefacto_actualizado, ruta_temporal)
+            ruta_temporal.replace(ruta_nueva)
+        except Exception as error:
+            ruta_temporal.unlink(missing_ok=True)
+            ruta_nueva.unlink(missing_ok=True)
+            raise ErrorModelo("No fue posible actualizar el archivo del modelo.") from error
+
+        try:
+            with self._conexion() as conexion:
+                conexion.execute(
+                    """
+                    UPDATE modelos_guardados
+                    SET fecha_modificacion = ?,
+                        cantidad_registros = ?,
+                        cantidad_variables = ?,
+                        cantidad_grupos = ?,
+                        silhouette = ?,
+                        archivo = ?,
+                        columnas = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        fecha_modificacion.isoformat(),
+                        len(resultado.asignaciones),
+                        len(resultado.columnas),
+                        resultado.k_usado,
+                        resultado.silhouette,
+                        nombre_archivo,
+                        json.dumps(list(resultado.columnas)),
+                        identificador,
+                    ),
+                )
+        except sqlite3.Error as error:
+            ruta_nueva.unlink(missing_ok=True)
+            raise ErrorModelo(
+                "El archivo se actualizó, pero no fue posible registrar los cambios."
+            ) from error
+
+        ruta_anterior.unlink(missing_ok=True)
+        return self.listar_modelos_por_id(identificador)
+
+    def listar_modelos_por_id(self, modelo_id: int) -> ModeloGuardado:
+        """Devuelve los metadatos de un modelo por su identificador."""
+        try:
+            with self._conexion() as conexion:
+                conexion.row_factory = sqlite3.Row
+                fila = conexion.execute(
+                    "SELECT * FROM modelos_guardados WHERE id = ?", (int(modelo_id),)
+                ).fetchone()
+        except (sqlite3.Error, TypeError, ValueError) as error:
+            raise ErrorModelo("No fue posible localizar el modelo solicitado.") from error
+        if fila is None:
+            raise ErrorModelo("El modelo solicitado no existe.")
+        return self._desde_fila(fila)
 
     def listar_modelos_compatibles(
         self, columnas_disponibles: Iterable[str]

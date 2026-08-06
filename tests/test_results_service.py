@@ -34,14 +34,6 @@ class PruebasServicioResultados(unittest.TestCase):
         self.assertAlmostEqual(resumen["Porcentaje"].sum(), 1.0)
         self.assertEqual(len(resumen), self.resultado.k_usado)
 
-    def test_crea_proyeccion_pca_para_registros_y_centros(self):
-        proyeccion = self.servicio.crear_proyeccion_pca(self.resultado)
-
-        self.assertEqual(len(proyeccion.puntos), 8)
-        self.assertEqual(len(proyeccion.centros), self.resultado.k_usado)
-        self.assertEqual(len(proyeccion.varianza_explicada), 2)
-        self.assertGreater(sum(proyeccion.varianza_explicada), 0.0)
-
     def test_crea_tablas_de_centros_y_asignaciones(self):
         centros = self.servicio.crear_tabla_centros(self.resultado)
         asignaciones = self.servicio.crear_tabla_asignaciones(self.resultado)

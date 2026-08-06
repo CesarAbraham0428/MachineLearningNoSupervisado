@@ -145,7 +145,7 @@ def _opcion_modelo_compatible(modelo: ModeloGuardado) -> str:
     return (
         f"{modelo.nombre} · {modelo.cantidad_grupos} grupos · "
         f"Silhouette {modelo.silhouette:.3f} · "
-        f"{modelo.fecha_creacion.strftime('%d/%m/%Y')}"
+        f"{modelo.fecha_modificacion.strftime('%d/%m/%Y')}"
     )
 
 
@@ -193,8 +193,8 @@ def _renderizar_reutilizacion_modelos(
                 f":material/dataset: Dataset de origen: {modelo_seleccionado.dataset_origen}"
             )
             st.caption(
-                f":material/calendar_month: Entrenado el "
-                f"{modelo_seleccionado.fecha_creacion.strftime('%d/%m/%Y %H:%M')}"
+                f":material/calendar_month: Última modificación: "
+                f"{modelo_seleccionado.fecha_modificacion.strftime('%d/%m/%Y %H:%M')}"
             )
         st.caption(
             "Variables del modelo: " + ", ".join(modelo_seleccionado.columnas)
@@ -255,12 +255,21 @@ def _renderizar_reutilizacion_modelos(
                     artefacto["modelo"],
                     artefacto["escalador"],
                 )
+                servicio_modelo.actualizar_modelo_reentrenado(
+                    modelo_seleccionado.id, resultado
+                )
                 mensaje = (
                     f'Se continuó el entrenamiento de "{modelo_seleccionado.nombre}" '
-                    f"con los nuevos datos. Silhouette obtenido: {resultado.silhouette:.3f}."
+                    "y se actualizó el modelo guardado. "
+                    f"Silhouette obtenido: {resultado.silhouette:.3f}."
                 )
         except ErrorEntrenamiento as error:
             st.error(str(error))
+            return
+        except ErrorModelo as error:
+            st.error(
+                f"El modelo se reentrenó, pero no fue posible guardar los cambios: {error}"
+            )
             return
 
         st.session_state.pop("variable_perfil_resultados", None)
@@ -270,10 +279,16 @@ def _renderizar_reutilizacion_modelos(
         tamanos = resultado.tamanos_clusters.rename("Registros").to_frame()
         tamanos.index.name = "Grupo"
         st.dataframe(tamanos, width="stretch")
-        st.caption(
-            "Revisa los resultados completos en la pestaña **Resultados**, "
-            "donde también puedes guardar esta versión como un nuevo modelo."
-        )
+        if usar:
+            st.caption(
+                "Revisa los resultados completos en la pestaña **Resultados**, "
+                "donde también puedes guardar esta versión como un nuevo modelo."
+            )
+        else:
+            st.caption(
+                "El modelo guardado y su fecha de modificación ya se actualizaron. "
+                "Puedes revisar los resultados completos en **Resultados**."
+            )
 
 
 def _renderizar_modelo_kmeans() -> None:

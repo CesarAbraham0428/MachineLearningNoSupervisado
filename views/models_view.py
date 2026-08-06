@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 import pandas as pd
 import plotly.express as px
 import streamlit as st
@@ -42,7 +44,9 @@ def _obtener_dataset_activo() -> pd.DataFrame | None:
 
 
 @st.cache_resource(show_spinner=False)
-def _cargar_artefacto_cacheado(modelo_id: int) -> dict:
+def _cargar_artefacto_cacheado(
+    modelo_id: int, fecha_modificacion: datetime | None = None
+) -> dict:
     """Evita releer el archivo joblib del modelo en cada rerun de Streamlit."""
     return ServicioModelo().cargar_modelo(modelo_id)
 
@@ -55,7 +59,9 @@ def _crear_tabla_modelos(modelos, datos_activos: pd.DataFrame | None) -> pd.Data
             compatible = "Sin dataset activo"
         else:
             try:
-                artefacto = _cargar_artefacto_cacheado(modelo.id)
+                artefacto = _cargar_artefacto_cacheado(
+                    modelo.id, modelo.fecha_modificacion
+                )
                 _, error = _preparar_datos_para_prediccion(datos_activos, artefacto)
                 compatible = "Sí" if not error else "No"
             except ErrorModelo:
@@ -64,8 +70,8 @@ def _crear_tabla_modelos(modelos, datos_activos: pd.DataFrame | None) -> pd.Data
         filas.append(
             {
                 "Modelo": modelo.nombre,
-                "Categoría": modelo.categoria,
                 "Fecha de creación": modelo.fecha_creacion,
+                "Fecha de modificación": modelo.fecha_modificacion,
                 "Dataset de origen": modelo.dataset_origen,
                 "Registros": modelo.cantidad_registros,
                 "Variables": modelo.cantidad_variables,
@@ -215,6 +221,16 @@ def _continuar_entrenamiento_en_dataset_activo(
         )
         return
 
+    try:
+        ServicioModelo().actualizar_modelo_reentrenado(modelo.id, resultado_nuevo)
+        _cargar_artefacto_cacheado.clear()
+    except ErrorModelo as error:
+        st.error(
+            f"El modelo se reentrenó, pero no fue posible guardar los cambios: {error}",
+            icon=":material/error:",
+        )
+        return
+
     st.session_state["resultado_entrenamiento"] = resultado_nuevo
     st.session_state["modelo_entrenado"] = True
     st.session_state["mapeo_likert"] = dict(artefacto.get("mapeo_likert", {}))
@@ -343,7 +359,7 @@ def _renderizar_detalle_modelo(modelo: ModeloGuardado) -> None:
     """Muestra el detalle de un modelo guardado y permite reutilizarlo."""
     with st.container(border=True, key=f"detalle-modelo-{modelo.id}"):
         st.subheader(f":material/model_training: {modelo.nombre}")
-        st.caption(f"Categoría: {modelo.categoria} · Dataset de origen: {modelo.dataset_origen}")
+        st.caption(f"Dataset de origen: {modelo.dataset_origen}")
 
         tarjetas = (
             ("Grupos", modelo.cantidad_grupos),
@@ -358,7 +374,9 @@ def _renderizar_detalle_modelo(modelo: ModeloGuardado) -> None:
                 st.metric(etiqueta, valor)
 
         try:
-            artefacto = _cargar_artefacto_cacheado(modelo.id)
+            artefacto = _cargar_artefacto_cacheado(
+                modelo.id, modelo.fecha_modificacion
+            )
         except ErrorModelo as error:
             st.error(str(error), icon=":material/error:")
             return
@@ -434,6 +452,11 @@ def renderizar_vista_modelos() -> None:
             "Fecha de creación": st.column_config.DatetimeColumn(
                 "Fecha de creación",
                 format="DD/MM/YYYY, hh:mm a",
+            ),
+            "Fecha de modificación": st.column_config.DatetimeColumn(
+                "Fecha de modificación",
+                format="DD/MM/YYYY, hh:mm a",
+                help="Se actualiza automáticamente al reentrenar el modelo.",
             ),
             "Calidad de separación": st.column_config.NumberColumn(
                 "Calidad de separación",

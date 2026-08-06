@@ -23,15 +23,13 @@ from reportlab.platypus import (
     TableStyle,
 )
 from reportlab.graphics.charts.barcharts import VerticalBarChart
-from reportlab.graphics.charts.lineplots import ScatterPlot
 from reportlab.graphics.charts.piecharts import Pie
 from reportlab.graphics.charts.textlabels import Label
 from reportlab.graphics.shapes import Circle, Drawing, Line, PolyLine, Rect, String
-from reportlab.graphics.widgets.markers import makeMarker
 
 import pandas as pd
 
-from services.results_service import ProyeccionPCA, ServicioResultados
+from services.results_service import ServicioResultados
 from services.statistics_service import ResumenEstadistico, ServicioEstadisticas
 from services.training_service import ResultadoEntrenamiento
 
@@ -47,17 +45,6 @@ class ServicioReportes:
     _TINTA = colors.HexColor("#2B2622")
     _GRIS = colors.HexColor("#6E5C50")
     _FONDO_TABLA = colors.HexColor("#F4E8D9")
-
-    _PALETA_GRUPOS = [
-        colors.HexColor("#2388FF"),
-        colors.HexColor("#43D78A"),
-        colors.HexColor("#B06DF5"),
-        colors.HexColor("#F59E2F"),
-        colors.HexColor("#EF5576"),
-        colors.HexColor("#22B8CF"),
-        colors.HexColor("#F4C95D"),
-        colors.HexColor("#8B9A77"),
-    ]
 
     @staticmethod
     def _estilos() -> dict[str, ParagraphStyle]:
@@ -800,97 +787,6 @@ class ServicioReportes:
                 parrafos.append(Paragraph(texto, estilos["cuerpo"]))
         return parrafos
 
-    @classmethod
-    def _grafica_dispersion(
-        cls, proyeccion: ProyeccionPCA, ancho: float = 680, alto: float = 260
-    ) -> Drawing:
-        """Representa los registros y los centros de grupo en un plano PCA."""
-        dibujo = Drawing(ancho, alto)
-        dibujo.add(
-            String(
-                0,
-                alto - 14,
-                "Mapa de similitud entre registros (proyección PCA)",
-                fontName="Helvetica-Bold",
-                fontSize=9.5,
-                fillColor=cls._TINTA,
-            )
-        )
-
-        grafico = ScatterPlot()
-        grafico.x = 55
-        grafico.y = 34
-        grafico.width = ancho - 90
-        grafico.height = alto - 74
-        grafico.lineLabelFormat = None
-        grafico.xLabel = ""
-        grafico.yLabel = ""
-
-        grupos_ordenados = sorted(
-            proyeccion.puntos["Grupo"].unique(),
-            key=lambda grupo: int(str(grupo).split()[-1]),
-        )
-        series = []
-        for grupo in grupos_ordenados:
-            subconjunto = proyeccion.puntos[proyeccion.puntos["Grupo"] == grupo]
-            series.append(
-                list(zip(subconjunto["Componente 1"], subconjunto["Componente 2"]))
-            )
-        series.append(
-            list(zip(proyeccion.centros["Componente 1"], proyeccion.centros["Componente 2"]))
-        )
-        grafico.data = series
-
-        for indice, _ in enumerate(grupos_ordenados):
-            color = cls._PALETA_GRUPOS[indice % len(cls._PALETA_GRUPOS)]
-            grafico.lines[indice].symbol = makeMarker("FilledCircle")
-            grafico.lines[indice].symbol.fillColor = color
-            grafico.lines[indice].symbol.strokeColor = None
-            grafico.lines[indice].symbol.size = 3.4
-
-        indice_centros = len(grupos_ordenados)
-        grafico.lines[indice_centros].symbol = makeMarker("FilledCross")
-        grafico.lines[indice_centros].symbol.fillColor = cls._TINTA
-        grafico.lines[indice_centros].symbol.strokeColor = cls._TINTA
-        grafico.lines[indice_centros].symbol.size = 8
-
-        grafico.xValueAxis.labels.fontName = "Helvetica"
-        grafico.xValueAxis.labels.fontSize = 6.5
-        grafico.yValueAxis.labels.fontName = "Helvetica"
-        grafico.yValueAxis.labels.fontSize = 6.5
-        grafico.xValueAxis.visibleGrid = True
-        grafico.yValueAxis.visibleGrid = True
-        grafico.xValueAxis.gridStrokeColor = colors.HexColor("#E7DCC9")
-        grafico.yValueAxis.gridStrokeColor = colors.HexColor("#E7DCC9")
-        grafico.xValueAxis.strokeColor = cls._GRIS
-        grafico.yValueAxis.strokeColor = cls._GRIS
-        dibujo.add(grafico)
-
-        varianza_1, varianza_2 = proyeccion.varianza_explicada
-        dibujo.add(
-            String(
-                grafico.x + grafico.width / 2,
-                4,
-                f"Componente 1 ({varianza_1:.1%} de varianza explicada)",
-                textAnchor="middle",
-                fontName="Helvetica",
-                fontSize=7,
-                fillColor=cls._GRIS,
-            )
-        )
-        etiqueta_y = Label()
-        etiqueta_y.x = grafico.x - 42
-        etiqueta_y.y = grafico.y + (grafico.height / 2)
-        etiqueta_y.setText(f"Componente 2 ({varianza_2:.1%})")
-        etiqueta_y.angle = 90
-        etiqueta_y.fontName = "Helvetica"
-        etiqueta_y.fontSize = 7
-        etiqueta_y.fillColor = cls._GRIS
-        etiqueta_y.boxAnchor = "c"
-        etiqueta_y.textAnchor = "middle"
-        dibujo.add(etiqueta_y)
-        return dibujo
-
     @staticmethod
     def _interpretacion_entrenamiento(
         resultado: ResultadoEntrenamiento, resumen_grupos: pd.DataFrame
@@ -1118,7 +1014,6 @@ class ServicioReportes:
 
         servicio_resultados = ServicioResultados()
         resumen_grupos = servicio_resultados.crear_resumen_grupos(resultado)
-        proyeccion = servicio_resultados.crear_proyeccion_pca(resultado)
         centros = servicio_resultados.crear_tabla_centros(resultado)
         interpretaciones = servicio_resultados.crear_interpretaciones_grupos(
             resultado
@@ -1143,7 +1038,7 @@ class ServicioReportes:
             Paragraph("INFORME ACADÉMICO / RESULTADOS DEL ENTRENAMIENTO", estilos["subtitulo"]),
             Paragraph("Resultados del entrenamiento K-Means", estilos["titulo"]),
             Paragraph(
-                "Métricas, grupos y proyección obtenidos tras entrenar el modelo de agrupamiento",
+                "Métricas, grupos e interpretación obtenidos tras entrenar el modelo de agrupamiento",
                 estilos["subtitulo"],
             ),
             HRFlowable(width="100%", thickness=1, color=self._AZUL, spaceAfter=12),
@@ -1217,10 +1112,9 @@ class ServicioReportes:
                 Paragraph("Perfil e interpretación por rasgo de los grupos", estilos["seccion"]),
                 *self._parrafos_interpretaciones_grupos(interpretaciones, perfiles, estilos),
                 PageBreak(),
-                Paragraph("Gráficas del entrenamiento", estilos["seccion"]),
+                Paragraph("Distribución de los grupos", estilos["seccion"]),
                 Paragraph(
-                    "Tamaño de cada grupo y proyección en dos dimensiones de los "
-                    "registros agrupados.",
+                    "Cantidad de registros asignados a cada grupo.",
                     estilos["cuerpo"],
                 ),
                 Spacer(1, 8),
@@ -1240,19 +1134,5 @@ class ServicioReportes:
                 etiqueta_eje_x="Grupo",
             )
         )
-        historia.extend(
-            [
-                Spacer(1, 10),
-                self._grafica_dispersion(proyeccion),
-                Spacer(1, 4),
-                Paragraph(
-                    "Cada color representa un grupo distinto; la marca en forma de "
-                    "cruz indica el centro de cada grupo. Esta proyección solo se usa "
-                    "para visualizar y no participó en el entrenamiento del modelo.",
-                    estilos["cuerpo"],
-                ),
-            ]
-        )
-
         documento.build(historia, onFirstPage=self._encabezado_pie, onLaterPages=self._encabezado_pie)
         return salida.getvalue()

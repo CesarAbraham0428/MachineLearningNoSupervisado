@@ -10,6 +10,7 @@ from services.model_service import ServicioModelo
 from services.training_service import ServicioEntrenamiento
 from views.models_view import (
     _continuar_entrenamiento_en_dataset_activo,
+    _crear_tabla_modelos,
     _predecir_clusters,
     _preparar_datos_para_prediccion,
     _tabla_centros_modelo,
@@ -30,7 +31,6 @@ def _entrenar_y_guardar(servicio_modelo: ServicioModelo):
     guardado = servicio_modelo.guardar_modelo(
         resultado,
         nombre="Modelo de prueba",
-        categoria="Pruebas",
         dataset_origen="dataset_prueba.csv",
     )
     return guardado, resultado
@@ -108,6 +108,17 @@ class PruebasReutilizarModeloGuardado(unittest.TestCase):
         self.assertIsNone(datos_listos)
         self.assertIn("faltantes", error)
 
+    def test_tabla_reemplaza_categoria_por_fecha_de_modificacion(self):
+        tabla = _crear_tabla_modelos([self.guardado], datos_activos=None)
+
+        self.assertNotIn("Categoría", tabla.columns)
+        self.assertIn("Fecha de creación", tabla.columns)
+        self.assertIn("Fecha de modificación", tabla.columns)
+        self.assertEqual(
+            tabla.loc[0, "Fecha de modificación"],
+            self.guardado.fecha_modificacion,
+        )
+
 
 
     def test_continuar_entrenamiento_usa_centros_y_escalador_guardados(self):
@@ -117,7 +128,7 @@ class PruebasReutilizarModeloGuardado(unittest.TestCase):
                 "Responsabilidad": [1.1, 1.0, 4.9, 4.8],
             }
         )
-        modelo_guardado = SimpleNamespace(nombre="Modelo de prueba")
+        modelo_guardado = SimpleNamespace(id=7, nombre="Modelo de prueba")
         modelo_previo = object()
         escalador_previo = object()
         artefacto = {
@@ -126,6 +137,7 @@ class PruebasReutilizarModeloGuardado(unittest.TestCase):
             "escalador": escalador_previo,
         }
         servicio = MagicMock()
+        servicio_modelo = MagicMock()
         resultado = object()
         servicio.continuar_entrenamiento.return_value = resultado
         streamlit = MagicMock()
@@ -133,6 +145,7 @@ class PruebasReutilizarModeloGuardado(unittest.TestCase):
 
         with (
             patch("views.models_view.ServicioEntrenamiento", return_value=servicio),
+            patch("views.models_view.ServicioModelo", return_value=servicio_modelo),
             patch("views.models_view.st", streamlit),
         ):
             _continuar_entrenamiento_en_dataset_activo(
@@ -144,6 +157,9 @@ class PruebasReutilizarModeloGuardado(unittest.TestCase):
             ("Extraversión", "Responsabilidad"),
             modelo_previo,
             escalador_previo,
+        )
+        servicio_modelo.actualizar_modelo_reentrenado.assert_called_once_with(
+            7, resultado
         )
         self.assertIs(streamlit.session_state["resultado_entrenamiento"], resultado)
         streamlit.rerun.assert_called_once()

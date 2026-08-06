@@ -2,26 +2,15 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from numbers import Integral
 
 import pandas as pd
-from sklearn.decomposition import PCA
 
 from services.training_service import ResultadoEntrenamiento
 
 
 class ErrorResultados(ValueError):
     """Indica que el resultado entrenado no puede visualizarse."""
-
-
-@dataclass(frozen=True)
-class ProyeccionPCA:
-    """Representación bidimensional de registros y centros de los grupos."""
-
-    puntos: pd.DataFrame
-    centros: pd.DataFrame
-    varianza_explicada: tuple[float, float]
 
 
 class ServicioResultados:
@@ -83,54 +72,6 @@ class ServicioResultados:
                     resultado.tamanos_clusters.astype(float) / total
                 ).to_list(),
             }
-        )
-
-    def crear_proyeccion_pca(
-        self, resultado: ResultadoEntrenamiento
-    ) -> ProyeccionPCA:
-        """Reduce los datos a dos componentes para mostrar los grupos en un plano."""
-        self._validar(resultado)
-        datos = resultado.datos_estandarizados.astype(float)
-        asignaciones = resultado.asignaciones.reindex(datos.index)
-        if asignaciones.isna().any():
-            raise ErrorResultados(
-                "Las asignaciones de grupo no coinciden con los registros entrenados."
-            )
-
-        pca = PCA(n_components=2)
-        coordenadas = pca.fit_transform(datos)
-        centros = pca.transform(resultado.centroides_estandarizados)
-
-        puntos = pd.DataFrame(
-            {
-                "Componente 1": coordenadas[:, 0],
-                "Componente 2": coordenadas[:, 1],
-                "Grupo": asignaciones.astype(int).map(
-                    lambda grupo: f"Grupo {grupo}"
-                ),
-                "Registro": [
-                    f"Registro {posicion}"
-                    for posicion in range(1, len(datos) + 1)
-                ],
-            },
-            index=datos.index,
-        )
-        centros_df = pd.DataFrame(
-            {
-                "Componente 1": centros[:, 0],
-                "Componente 2": centros[:, 1],
-                "Grupo": [
-                    f"Grupo {grupo}"
-                    for grupo in range(1, resultado.k_usado + 1)
-                ],
-            }
-        )
-        return ProyeccionPCA(
-            puntos=puntos,
-            centros=centros_df,
-            varianza_explicada=tuple(
-                float(valor) for valor in pca.explained_variance_ratio_
-            ),
         )
 
     def crear_tabla_centros(
